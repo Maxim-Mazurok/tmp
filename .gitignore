@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+
+# Recorded videos and extracted frames
+*.mp4
+2026-*/
+
+# Debug/analysis images
+*.jpg
+
+# Temporary analysis and test scripts (not the regression test)
+analyze_*.py
+test_detection.py
+test_overlap.py
+test_perframe.py
+verify_fixes.py
