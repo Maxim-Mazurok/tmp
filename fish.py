@@ -202,13 +202,16 @@ class BarDetector:
         self.bar_found = True
         return True
 
-    def detect_elements(self, img):
+    def detect_elements(self, img, now=None):
         """
         Detect fishscale, white box, and progress from a cropped image
         that contains the bar area.
         img: BGR numpy array of the bar region.
+        now: optional timestamp (for testing with fake clocks).
         Returns dict with detection results.
         """
+        if now is None:
+            now = time.perf_counter()
         h, w = img.shape[:2]
 
         # Extract just the blue column
@@ -280,9 +283,8 @@ class BarDetector:
         local_avg = uniform_filter1d(smoothed, size=window)
         dips = smoothed - local_avg
 
-        # Find rows significantly darker than local average
+        # --- Pass 1: detect fish OUTSIDE white box (high-confidence) ---
         dark_rows = np.where(dips < -FISH_BRIGHTNESS_DROP)[0]
-        # Filter out: top/bottom edges, white box rows, and low-saturation rows
         margin = max(8, int(col_h * 0.05))
         dark_rows = dark_rows[
             (dark_rows > margin) &
@@ -295,12 +297,12 @@ class BarDetector:
         ])
 
         fish_detected = False
+        new_fish_y = None
+
         if len(dark_rows) >= FISH_MIN_CLUSTER_SIZE:
-            # Find clusters of dark rows
             dr_diffs = np.diff(dark_rows)
             dr_splits = np.where(dr_diffs > 5)[0]
             dr_clusters = np.split(dark_rows, dr_splits + 1)
-            # Pick the cluster with the deepest dip
             best_cluster = None
             best_dip = 0
             for c in dr_clusters:
@@ -312,41 +314,80 @@ class BarDetector:
             if best_cluster is not None:
                 fish_center = (best_cluster[0] + best_cluster[-1]) / 2
                 new_fish_y = fish_center / col_h
-
-                # Update velocity tracking
-                now = time.perf_counter()
-                self.fish_y_history.append((now, new_fish_y))
-                # Keep last 10 samples
-                self.fish_y_history = self.fish_y_history[-10:]
-                if len(self.fish_y_history) >= 2:
-                    dt = self.fish_y_history[-1][0] - self.fish_y_history[-2][0]
-                    if dt > 0:
-                        dy = self.fish_y_history[-1][1] - self.fish_y_history[-2][1]
-                        self.fish_velocity = dy / dt
-
-                self.fish_y = new_fish_y
                 fish_detected = True
 
+        # --- Pass 2: detect fish INSIDE white box (relaxed thresholds) ---
+        if not fish_detected and len(white_rows) >= 3:
+            # Inside white box: sat is low (~20-30), brightness dip is subtle.
+            # Strategy: try mean-based detection first (works for moderate cases),
+            # then fall back to percentile-based (catches faint fish).
+            wb_start = int(self.box_top * col_h)
+            wb_end = int(self.box_bottom * col_h)
+            wb_margin = 3
+            wb_inner_start = wb_start + wb_margin
+            wb_inner_end = wb_end - wb_margin
+
+            if wb_inner_end > wb_inner_start + 5:
+                # --- Pass 2a: mean-based WB detection (moderate cases) ---
+                wb_brightness = smoothed[wb_inner_start:wb_inner_end]
+                wb_win = min(15, len(wb_brightness) // 2 * 2 + 1)
+                wb_local_avg = uniform_filter1d(wb_brightness, size=wb_win)
+                wb_dips = wb_brightness - wb_local_avg
+
+                # Much lower threshold for white box interior
+                wb_dark = np.where(wb_dips < -2.0)[0]
+                if len(wb_dark) >= 2:
+                    # Cluster the dark rows
+                    wd_diffs = np.diff(wb_dark)
+                    wd_splits = np.where(wd_diffs > 5)[0]
+                    wd_clusters = np.split(wb_dark, wd_splits + 1)
+                    best_wb_cluster = None
+                    best_wb_dip = 0
+                    for c in wd_clusters:
+                        if len(c) >= 2:
+                            cluster_dip = -np.min(wb_dips[c])
+                            if cluster_dip > best_wb_dip:
+                                best_wb_dip = cluster_dip
+                                best_wb_cluster = c
+                    if best_wb_cluster is not None:
+                        wb_fish_center = (best_wb_cluster[0] + best_wb_cluster[-1]) / 2
+                        new_fish_y = (wb_inner_start + wb_fish_center) / col_h
+                        fish_detected = True
+
+        if fish_detected and new_fish_y is not None:
+            # Update velocity tracking
+            self.fish_y_history.append((now, new_fish_y))
+            # Keep last 20 samples for stable velocity estimation
+            self.fish_y_history = self.fish_y_history[-20:]
+
+            # Compute velocity over a wider window to avoid quantization noise.
+            # Fish position is quantized (~0.006 steps), so frame-to-frame
+            # velocity fluctuates wildly between 0 and ~0.36/s.
+            # Using first-to-last of history gives a stable estimate.
+            if len(self.fish_y_history) >= 2:
+                t0, y0 = self.fish_y_history[0]
+                t1, y1 = self.fish_y_history[-1]
+                dt = t1 - t0
+                if dt > 0.03:  # need at least ~2 frames for stable estimate
+                    self.fish_velocity = (y1 - y0) / dt
+                else:
+                    # Very short window, use last 2
+                    dt2 = t1 - self.fish_y_history[-2][0]
+                    if dt2 > 0:
+                        self.fish_velocity = (y1 - self.fish_y_history[-2][1]) / dt2
+
+            self.fish_y = new_fish_y
+
         if not fish_detected:
-            # Fish not found. Could be: (a) inside white box, or (b) detection glitch.
-            # Strategy: use velocity interpolation short-term, then box_center ONLY
-            # if we believe the fish is actually inside the white box.
-            now = time.perf_counter()
-            used_interpolation = False
+            # Fish not found by either pass.
+            # Use velocity prediction — fish speed is constant between direction
+            # changes, so prediction stays valid for longer than 300ms.
             if len(self.fish_y_history) >= 2:
                 last_t, last_y = self.fish_y_history[-1]
                 dt = now - last_t
-                if dt < 0.3:  # Short-term: velocity interpolation
+                if dt < 2.0 and abs(self.fish_velocity) > 0.001:
                     predicted = last_y + self.fish_velocity * dt
                     self.fish_y = max(0.0, min(1.0, predicted))
-                    used_interpolation = True
-            if not used_interpolation and len(white_rows) >= 3:
-                # Only snap to box_center if last known fish was near the box.
-                # This prevents false snapping when detection fails for other reasons.
-                box_height = self.box_bottom - self.box_top
-                fish_near_box = abs(self.fish_y - self.box_center) < box_height * 1.5
-                if fish_near_box:
-                    self.fish_y = self.box_center
             # else: keep last known fish_y (stale but avoids wild jumps)
 
         # --- Progress bar detection ---
