@@ -30,6 +30,9 @@ import sys
 import time
 import signal
 import argparse
+import traceback
+import ctypes
+import ctypes.wintypes
 import numpy as np
 import cv2
 import mss
@@ -39,18 +42,14 @@ pydirectinput = None
 
 # ─── Configuration ──────────────────────────────────────────────────────
 
-# Screen resolution (used for initial bar search region)
-SCREEN_W = 3840
-SCREEN_H = 2400
-
-# Search region for finding the blue column (center of screen)
-SEARCH_MARGIN_X = 600  # pixels from center
-SEARCH_MARGIN_Y = 500
+# Search region margins as fraction of game window size
+SEARCH_MARGIN_X_FRAC = 0.30  # 30% of game width from center
+SEARCH_MARGIN_Y_FRAC = 0.45  # 45% of game height from center
 
 # HSV thresholds for blue column detection
-BLUE_H_MIN, BLUE_H_MAX = 85, 110
-BLUE_S_MIN = 65
-BLUE_V_MIN = 75
+BLUE_H_MIN, BLUE_H_MAX = 85, 115
+BLUE_S_MIN = 25
+BLUE_V_MIN = 20  # Live game bar can be very dark (V=20-60 in unfilled areas)
 
 # White box detection: saturation drops below this threshold
 WHITE_BOX_SAT_THRESHOLD = 55
@@ -106,52 +105,81 @@ class BarDetector:
         Returns True if bar found and coordinates updated.
         """
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-        blue_mask = cv2.inRange(
-            hsv,
-            np.array([BLUE_H_MIN, BLUE_S_MIN, BLUE_V_MIN]),
-            np.array([BLUE_H_MAX, 255, 255])
-        )
 
-        # Find columns with significant blue pixel count (vertical strip)
-        col_sums = np.sum(blue_mask > 0, axis=0)
-        # The blue column should have many consecutive blue pixels vertically
-        # Expect at least 100 blue pixels in a column (out of ~330 height)
-        blue_cols = np.where(col_sums > 80)[0]
-        if len(blue_cols) < 5:
-            return False
+        # --- Pass 1: Find columns with BRIGHT blue/cyan pixels.
+        # Only the bar's bright gradient section has these; water/sky are darker.
+        # Try progressively lower V thresholds until valid bar groups are found.
+        # Higher V thresholds are preferred as they better separate the bar
+        # from blue sky in daytime scenes.
+        img_w = img.shape[1]
+        min_bar_width = max(5, int(img_w * 0.003))    # ~0.3% of width
+        max_bar_width = max(50, int(img_w * 0.05))     # ~5% of width
 
-        # Find continuous groups of blue columns
-        diffs = np.diff(blue_cols)
-        splits = np.where(diffs > 5)[0]
-        groups = np.split(blue_cols, splits + 1)
-
-        # The fishing column is a narrow vertical strip (~20-80px wide).
-        # Filter out groups that are too wide (sky, UI) or too narrow.
-        # Also validate that the group is much taller than wide (aspect ratio).
         best_group = None
-        best_height = 0
-        for grp in groups:
-            width = grp[-1] - grp[0] + 1
-            if width < 10 or width > 100:
+        best_bright_score = 0
+
+        for v_thresh in (200, 150, 100, 75):
+            bright_mask = cv2.inRange(
+                hsv,
+                np.array([BLUE_H_MIN, BLUE_S_MIN, v_thresh]),
+                np.array([BLUE_H_MAX, 255, 255])
+            )
+            bright_col_sums = np.sum(bright_mask > 0, axis=0)
+            min_bright = max(5, int(img.shape[0] * 0.02))
+            bright_cols = np.where(bright_col_sums > min_bright)[0]
+            if len(bright_cols) < 3:
                 continue
-            # Check vertical extent for this group
-            strip_hsv = hsv[:, grp[0]:grp[-1] + 1]
-            h_mask = (
-                (strip_hsv[:, :, 0] >= 80) &
-                (strip_hsv[:, :, 0] <= 115) &
-                (strip_hsv[:, :, 1] > 40)
-            ).astype(np.uint8)
-            rs = np.sum(h_mask, axis=1)
-            rows = np.where(rs > width * 0.3)[0]
-            if len(rows) < 50:
-                continue
-            height = rows[-1] - rows[0]
-            # Column must be tall and narrow (aspect ratio > 3:1)
-            if height < width * 3:
-                continue
-            if height > best_height:
-                best_height = height
-                best_group = (grp, rows)
+
+            # Group bright columns
+            diffs = np.diff(bright_cols)
+            splits = np.where(diffs > 5)[0]
+            groups = np.split(bright_cols, splits + 1)
+
+            for grp in groups:
+                width = grp[-1] - grp[0] + 1
+                if width < min_bar_width or width > max_bar_width:
+                    continue
+                bright_score = int(bright_col_sums[grp].sum())
+
+                # Find vertical extent: contiguous rows where >50% of bar
+                # columns are bright. Try progressively lower V for row extent.
+                strip_hsv = hsv[:, grp[0]:grp[-1] + 1]
+                bar_y1 = bar_y2 = -1
+                for v_min_row in (150, 100, 75):
+                    row_mask = (
+                        (strip_hsv[:, :, 0] >= 80) &
+                        (strip_hsv[:, :, 0] <= 120) &
+                        (strip_hsv[:, :, 1] >= 20) &
+                        (strip_hsv[:, :, 2] >= v_min_row)
+                    )
+                    row_counts = np.sum(row_mask, axis=1)
+                    candidate_rows = np.where(row_counts > width * 0.5)[0]
+                    if len(candidate_rows) < 10:
+                        continue
+                    cr_diffs = np.diff(candidate_rows)
+                    cr_splits = np.where(cr_diffs > 20)[0]
+                    cr_groups = np.split(candidate_rows, cr_splits + 1)
+                    largest = max(cr_groups, key=len)
+                    min_rows = max(20, int(img.shape[0] * 0.04))
+                    if len(largest) >= min_rows:
+                        bar_y1 = int(largest[0])
+                        bar_y2 = int(largest[-1])
+                        break
+
+                if bar_y1 < 0:
+                    continue
+                height = bar_y2 - bar_y1
+                if height < width * 3:
+                    continue
+                if bright_score > best_bright_score:
+                    best_bright_score = bright_score
+                    all_rows = np.arange(bar_y1, bar_y2 + 1)
+                    best_group = (grp, all_rows)
+
+            # If we found a valid group at this V threshold, use it
+            # (prefer higher V thresholds)
+            if best_group is not None:
+                break
 
         if best_group is None:
             return False
@@ -368,22 +396,73 @@ class BarDetector:
 
 # ─── Screen Capture ─────────────────────────────────────────────────────
 
-class ScreenCapture:
-    """Fast screen capture using mss."""
+def find_game_window(title_part='fivem'):
+    """Find the FiveM game window and return its DPI-aware screen rect."""
+    # Make process DPI-aware to get correct coordinates
+    try:
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)
+    except Exception:
+        pass
 
-    def __init__(self):
+    user32 = ctypes.windll.user32
+    results = []
+
+    def callback(hwnd, _):
+        length = user32.GetWindowTextLengthW(hwnd)
+        if length > 0:
+            buf = ctypes.create_unicode_buffer(length + 1)
+            user32.GetWindowTextW(hwnd, buf, length + 1)
+            if title_part.lower() in buf.value.lower():
+                rect = ctypes.wintypes.RECT()
+                user32.GetWindowRect(hwnd, ctypes.byref(rect))
+                w = rect.right - rect.left
+                h = rect.bottom - rect.top
+                if w > 100 and h > 100:  # Skip tiny windows
+                    results.append({
+                        'hwnd': hwnd,
+                        'title': buf.value,
+                        'left': rect.left,
+                        'top': rect.top,
+                        'width': w,
+                        'height': h,
+                    })
+        return True
+
+    WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.wintypes.HWND, ctypes.wintypes.LPARAM)
+    user32.EnumWindows(WNDENUMPROC(callback), 0)
+
+    if not results:
+        return None
+    # Pick the largest window if multiple matches
+    return max(results, key=lambda r: r['width'] * r['height'])
+
+
+class ScreenCapture:
+    """Fast screen capture using mss, targeting the game window."""
+
+    def __init__(self, game_window=None):
         self.sct = mss.mss()
-        self._monitor = self.sct.monitors[1]  # Primary monitor
+        if game_window:
+            self._region = game_window  # dict with left, top, width, height
+        else:
+            self._region = self.sct.monitors[1]  # Fallback to primary monitor
+        print(f"[*] Capture region: {self._region['width']}x{self._region['height']} "
+              f"at ({self._region['left']},{self._region['top']})")
 
     def capture_search_region(self):
-        """Capture center region for initial bar search."""
-        cx = self._monitor['left'] + self._monitor['width'] // 2
-        cy = self._monitor['top'] + self._monitor['height'] // 2
+        """Capture center region of the game window for initial bar search."""
+        gw = self._region['width']
+        gh = self._region['height']
+        margin_x = int(gw * SEARCH_MARGIN_X_FRAC)
+        margin_y = int(gh * SEARCH_MARGIN_Y_FRAC)
+
+        cx = self._region['left'] + gw // 2
+        cy = self._region['top'] + gh // 2
         region = {
-            'left': cx - SEARCH_MARGIN_X,
-            'top': cy - SEARCH_MARGIN_Y,
-            'width': SEARCH_MARGIN_X * 2,
-            'height': SEARCH_MARGIN_Y * 2,
+            'left': cx - margin_x,
+            'top': cy - margin_y,
+            'width': margin_x * 2,
+            'height': margin_y * 2,
         }
         screenshot = self.sct.grab(region)
         img = np.array(screenshot)[:, :, :3]  # BGRA → BGR
@@ -392,12 +471,31 @@ class ScreenCapture:
     def capture_bar_region(self, detector, padding=15):
         """Capture just the bar area for fast updates."""
         region = {
-            'left': self._monitor['left'] + detector.col_x1 - padding,
-            'top': self._monitor['top'] + detector.col_y1 - padding,
-            'width': (detector.prog_x2 - detector.col_x1) + padding * 2 + 30,
-            'height': (detector.col_y2 - detector.col_y1) + padding * 2,
+            'left': int(detector.col_x1 - padding),
+            'top': int(detector.col_y1 - padding),
+            'width': int((detector.prog_x2 - detector.col_x1) + padding * 2 + 30),
+            'height': int((detector.col_y2 - detector.col_y1) + padding * 2),
         }
-        screenshot = self.sct.grab(region)
+        if region['width'] <= 0 or region['height'] <= 0:
+            raise ValueError(
+                f"Invalid region dimensions: {region} "
+                f"bar=[{detector.col_x1},{detector.col_y1}]-[{detector.col_x2},{detector.col_y2}] "
+                f"prog_x2={detector.prog_x2}"
+            )
+        try:
+            screenshot = self.sct.grab(region)
+        except Exception as e:
+            # Retry once with a fresh mss instance (handles stale GDI resources)
+            try:
+                self.sct = mss.mss()
+                screenshot = self.sct.grab(region)
+            except Exception as e2:
+                raise RuntimeError(
+                    f"mss.grab failed (2 attempts): {type(e).__name__}:{e} / "
+                    f"{type(e2).__name__}:{e2} region={region} "
+                    f"bar=[{detector.col_x1},{detector.col_y1}]-[{detector.col_x2},{detector.col_y2}] "
+                    f"monitors={self.sct.monitors}"
+                )
         img = np.array(screenshot)[:, :, :3]
         return img, region
 
@@ -471,7 +569,14 @@ def run_automation(debug=False, reel_only=False):
     pydirectinput = pdi
     pydirectinput.FAILSAFE = True
 
-    capture = ScreenCapture()
+    # Find FiveM game window
+    game_win = find_game_window('fivem')
+    if game_win:
+        print(f"[*] Found game window: {game_win['title'][:60].encode('ascii', 'replace').decode()}")
+    else:
+        print("[!] FiveM window not found, using primary monitor")
+
+    capture = ScreenCapture(game_window=game_win)
     detector = BarDetector()
     controller = FishingController()
 
@@ -575,8 +680,10 @@ def run_automation(debug=False, reel_only=False):
             try:
                 img, region = capture.capture_bar_region(detector)
             except Exception as e:
-                # Bar might have moved or disappeared
-                print(f"[!] Capture failed ({e}), re-searching...")
+                traceback.print_exc()
+                print(f"[!] Capture failed: {type(e).__name__}: {e}")
+                print(f"[!] Detector coords: col=[{detector.col_x1},{detector.col_x2}] "
+                      f"y=[{detector.col_y1},{detector.col_y2}] prog_x2={detector.prog_x2}")
                 detector.bar_found = False
                 state = GameState.WAITING
                 if controller.space_held:
@@ -715,15 +822,17 @@ def run_test(image_path, debug=True):
                 # Search in center region
                 h, w = img.shape[:2]
                 cx, cy = w // 2, h // 2
-                roi = img[cy - SEARCH_MARGIN_Y:cy + SEARCH_MARGIN_Y,
-                          cx - SEARCH_MARGIN_X:cx + SEARCH_MARGIN_X]
+                mx = int(w * SEARCH_MARGIN_X_FRAC)
+                my = int(h * SEARCH_MARGIN_Y_FRAC)
+                roi = img[cy - my:cy + my,
+                          cx - mx:cx + mx]
                 if detector.find_bar(roi):
-                    detector.col_x1 += cx - SEARCH_MARGIN_X
-                    detector.col_x2 += cx - SEARCH_MARGIN_X
-                    detector.col_y1 += cy - SEARCH_MARGIN_Y
-                    detector.col_y2 += cy - SEARCH_MARGIN_Y
-                    detector.prog_x1 += cx - SEARCH_MARGIN_X
-                    detector.prog_x2 += cx - SEARCH_MARGIN_X
+                    detector.col_x1 += cx - mx
+                    detector.col_x2 += cx - mx
+                    detector.col_y1 += cy - my
+                    detector.col_y2 += cy - my
+                    detector.prog_x1 += cx - mx
+                    detector.prog_x2 += cx - mx
                     print(f"Bar found at x=[{detector.col_x1},{detector.col_x2}] y=[{detector.col_y1},{detector.col_y2}]")
 
             if detector.bar_found:
@@ -788,15 +897,17 @@ def run_test(image_path, debug=True):
 
         # Search center region
         cx, cy = w // 2, h // 2
-        roi = img[cy - SEARCH_MARGIN_Y:cy + SEARCH_MARGIN_Y,
-                  cx - SEARCH_MARGIN_X:cx + SEARCH_MARGIN_X]
+        mx = int(w * SEARCH_MARGIN_X_FRAC)
+        my = int(h * SEARCH_MARGIN_Y_FRAC)
+        roi = img[cy - my:cy + my,
+                  cx - mx:cx + mx]
         if detector.find_bar(roi):
-            detector.col_x1 += cx - SEARCH_MARGIN_X
-            detector.col_x2 += cx - SEARCH_MARGIN_X
-            detector.col_y1 += cy - SEARCH_MARGIN_Y
-            detector.col_y2 += cy - SEARCH_MARGIN_Y
-            detector.prog_x1 += cx - SEARCH_MARGIN_X
-            detector.prog_x2 += cx - SEARCH_MARGIN_X
+            detector.col_x1 += cx - mx
+            detector.col_x2 += cx - mx
+            detector.col_y1 += cy - my
+            detector.col_y2 += cy - my
+            detector.prog_x1 += cx - mx
+            detector.prog_x2 += cx - mx
             print(f"Bar found at x=[{detector.col_x1},{detector.col_x2}] y=[{detector.col_y1},{detector.col_y2}]")
 
             result = detector.detect_elements(img)
