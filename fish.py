@@ -69,7 +69,7 @@ HYSTERESIS = 0.08  # normalized band (fraction of bar height)
 # Game loop timing
 CAST_DELAY = 3.0       # seconds to wait after catch before recasting
 CAST_WAIT_POLL = 2.0   # seconds between polls while waiting for bite
-CONTROL_HZ = 30        # control loop frequency during minigame
+CONTROL_HZ = 60        # control loop frequency during minigame
 
 # ─── Detection ──────────────────────────────────────────────────────────
 
@@ -294,6 +294,7 @@ class BarDetector:
             if r not in white_box_rows and row_sat[r] > 70
         ])
 
+        fish_detected = False
         if len(dark_rows) >= FISH_MIN_CLUSTER_SIZE:
             # Find clusters of dark rows
             dr_diffs = np.diff(dark_rows)
@@ -324,6 +325,29 @@ class BarDetector:
                         self.fish_velocity = dy / dt
 
                 self.fish_y = new_fish_y
+                fish_detected = True
+
+        if not fish_detected:
+            # Fish not found. Could be: (a) inside white box, or (b) detection glitch.
+            # Strategy: use velocity interpolation short-term, then box_center ONLY
+            # if we believe the fish is actually inside the white box.
+            now = time.perf_counter()
+            used_interpolation = False
+            if len(self.fish_y_history) >= 2:
+                last_t, last_y = self.fish_y_history[-1]
+                dt = now - last_t
+                if dt < 0.3:  # Short-term: velocity interpolation
+                    predicted = last_y + self.fish_velocity * dt
+                    self.fish_y = max(0.0, min(1.0, predicted))
+                    used_interpolation = True
+            if not used_interpolation and len(white_rows) >= 3:
+                # Only snap to box_center if last known fish was near the box.
+                # This prevents false snapping when detection fails for other reasons.
+                box_height = self.box_bottom - self.box_top
+                fish_near_box = abs(self.fish_y - self.box_center) < box_height * 1.5
+                if fish_near_box:
+                    self.fish_y = self.box_center
+            # else: keep last known fish_y (stale but avoids wild jumps)
 
         # --- Progress bar detection ---
         px1 = max(0, self.prog_x1)
@@ -503,38 +527,73 @@ class ScreenCapture:
 # ─── Controller ─────────────────────────────────────────────────────────
 
 class FishingController:
-    """Binary controller: press space when fish is above box, release when below."""
+    """Accumulator controller with physics-informed braking.
+
+    Measured physics (from measure_box_physics.py):
+      - Gravity: 3.24 bar/s^2, Thrust: 3.61 bar/s^2
+      - Bottom-to-top: ~0.85s, Top-to-bottom: ~0.72s
+      - 50% duty drifts upward (thrust > gravity)
+      - Hover duty: ~47% (gravity/thrust ratio)
+
+    Strategy: proportional control with error-rate derivative for
+    natural braking, plus accumulator for smooth PWM output.
+    """
+
+    Kp = 1.5   # proportional gain
+    Kd = 1.0   # derivative gain (on error rate)
+    HOVER = 0.47  # duty for neutral hover (gravity/thrust ≈ 3.24/3.61 ≈ 0.47)
 
     def __init__(self):
         self.space_held = False
+        self._duty = self.HOVER
+        self._accumulator = 0.0
+        self._last_box = None
+        self._last_box_time = 0.0
 
     def update(self, detector):
-        """
-        Decide whether to hold or release space.
-        Returns: True if space should be held, False if released.
-        """
+        """Accumulator-based PWM with error-rate braking."""
         fish = detector.fish_y
         box_center = detector.box_center
+        now = time.perf_counter()
 
-        # Hysteresis: only change state if fish is clearly above/below
-        if self.space_held:
-            # Currently holding space (box moving up)
-            # Release if fish is below box center by hysteresis margin
-            # Remember: 0.0 = top, 1.0 = bottom
-            # Fish below box → fish_y > box_center → need to go down → release
-            if fish > box_center + HYSTERESIS:
-                self.space_held = False
+        # Error: positive = fish below box -> release, negative = above -> hold
+        error = fish - box_center
+
+        # Estimate box velocity for error-rate derivative
+        box_velocity = 0.0
+        if self._last_box is not None:
+            dt_box = now - self._last_box_time
+            if dt_box > 0.001:
+                box_velocity = (box_center - self._last_box) / dt_box
+        self._last_box = box_center
+        self._last_box_time = now
+
+        # error_rate = fish_velocity - box_velocity
+        # Provides natural braking: when box approaches fish, error_rate
+        # opposes the error, automatically reducing duty.
+        error_rate = detector.fish_velocity - box_velocity
+        d_term = error_rate * self.Kd
+
+        # Duty: HOVER = neutral, >HOVER = hold more (go up), <HOVER = release
+        self._duty = self.HOVER - self.Kp * error - d_term
+        self._duty = max(0.0, min(1.0, self._duty))
+
+        # Accumulator-based PWM: evenly spreads hold frames
+        self._accumulator += self._duty
+        if self._accumulator >= 1.0:
+            self._accumulator -= 1.0
+            self.space_held = True
         else:
-            # Currently released (box falling)
-            # Press if fish is above box center by hysteresis margin
-            # Fish above box → fish_y < box_center → need to go up → press
-            if fish < box_center - HYSTERESIS:
-                self.space_held = True
+            self.space_held = False
 
         return self.space_held
 
     def reset(self):
         self.space_held = False
+        self._duty = self.HOVER
+        self._accumulator = 0.0
+        self._last_box = None
+        self._last_box_time = 0.0
 
 
 # ─── State Machine ──────────────────────────────────────────────────────
@@ -608,6 +667,8 @@ def run_automation(debug=False, reel_only=False):
     topmost_set = False
 
     control_interval = 1.0 / CONTROL_HZ
+    last_status_log = 0.0
+    minigame_frames = 0
 
     # Convert search region offset for absolute coordinate mapping
     search_offset_x = 0
@@ -743,6 +804,14 @@ def run_automation(debug=False, reel_only=False):
                 catches += 1
                 continue
 
+            minigame_frames += 1
+            if now - last_status_log >= 2.0:
+                last_status_log = now
+                err = detector.fish_y - detector.box_center
+                print(f"  [status] fish={detector.fish_y:.2f} box={detector.box_center:.2f} "
+                      f"err={err:+.2f} duty={controller._duty:.0%} prog={detector.progress:.0%} "
+                      f"frames={minigame_frames}", flush=True)
+
             # Run controller
             was_held = controller.space_held
             should_hold = controller.update(detector)
@@ -758,10 +827,11 @@ def run_automation(debug=False, reel_only=False):
                 state_text = f"MINIGAME | Fish={detector.fish_y:.2f} Box={detector.box_center:.2f} Prog={detector.progress:.0%}"
                 cv2.putText(vis, state_text, (5, 15),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 255, 0), 1)
-                action = "SPACE DOWN" if controller.space_held else "space up"
+                duty_pct = int(controller._duty * 100)
+                action = f"{'HOLD' if controller.space_held else 'off '} duty={duty_pct}%"
+                color = (0, 255, 255) if controller.space_held else (128, 128, 128)
                 cv2.putText(vis, action, (5, 30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.35,
-                            (0, 255, 255) if controller.space_held else (128, 128, 128), 1)
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.35, color, 1)
                 # Scale up for visibility
                 scale = max(1, 400 // max(vis.shape[1], 1))
                 if scale > 1:

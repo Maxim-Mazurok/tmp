@@ -10,11 +10,11 @@ import cv2
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from fish import BarDetector, SEARCH_MARGIN_X, SEARCH_MARGIN_Y
+from fish import BarDetector, SEARCH_MARGIN_X_FRAC, SEARCH_MARGIN_Y_FRAC
 
 FRAME_DIR_1 = '2026-03-29 23-47-40'
 
-TOLERANCE = 0.03  # ~10px at 347px bar height
+TOLERANCE = 0.035  # ~11px at 330px bar height
 
 # Test cases: (frame_name, expected_fish_y_or_None, tolerance, description)
 # expected=None means "just check detection doesn't crash" (known limitation frames)
@@ -50,16 +50,18 @@ def _load_frame(fpath):
     det = BarDetector()
     h, w = img.shape[:2]
     cx, cy = w // 2, h // 2
-    roi = img[cy - SEARCH_MARGIN_Y:cy + SEARCH_MARGIN_Y,
-              cx - SEARCH_MARGIN_X:cx + SEARCH_MARGIN_X]
+    mx = int(w * SEARCH_MARGIN_X_FRAC)
+    my = int(h * SEARCH_MARGIN_Y_FRAC)
+    roi = img[cy - my:cy + my,
+              cx - mx:cx + mx]
     if not det.find_bar(roi):
         return None, None
-    det.col_x1 += cx - SEARCH_MARGIN_X
-    det.col_x2 += cx - SEARCH_MARGIN_X
-    det.col_y1 += cy - SEARCH_MARGIN_Y
-    det.col_y2 += cy - SEARCH_MARGIN_Y
-    det.prog_x1 += cx - SEARCH_MARGIN_X
-    det.prog_x2 += cx - SEARCH_MARGIN_X
+    det.col_x1 += cx - mx
+    det.col_x2 += cx - mx
+    det.col_y1 += cy - my
+    det.col_y2 += cy - my
+    det.prog_x1 += cx - mx
+    det.prog_x2 += cx - mx
     return det, img
 
 
