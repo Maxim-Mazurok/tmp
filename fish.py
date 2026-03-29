@@ -542,6 +542,7 @@ class FishingController:
     Kp = 1.5   # proportional gain
     Kd = 1.0   # derivative gain (on error rate)
     HOVER = 0.47  # duty for neutral hover (gravity/thrust ≈ 3.24/3.61 ≈ 0.47)
+    LOOKAHEAD = 0.10  # seconds to predict fish position ahead (~input lag)
 
     def __init__(self):
         self.space_held = False
@@ -551,13 +552,18 @@ class FishingController:
         self._last_box_time = 0.0
 
     def update(self, detector):
-        """Accumulator-based PWM with error-rate braking."""
+        """Accumulator-based PWM with error-rate braking and fish prediction."""
         fish = detector.fish_y
         box_center = detector.box_center
         now = time.perf_counter()
 
-        # Error: positive = fish below box -> release, negative = above -> hold
-        error = fish - box_center
+        # Predict where the fish WILL BE, not where it is now.
+        # Accounts for input lag (~100ms) + box acceleration time.
+        fish_pred = fish + detector.fish_velocity * self.LOOKAHEAD
+        fish_pred = max(0.0, min(1.0, fish_pred))
+
+        # Error against predicted fish position
+        error = fish_pred - box_center
 
         # Estimate box velocity for error-rate derivative
         box_velocity = 0.0
