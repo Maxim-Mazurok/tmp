@@ -24,10 +24,9 @@ import cv2
 import mss
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from fish import (
-    BarDetector, ScreenCapture, find_game_window,
-    SEARCH_MARGIN_X_FRAC, SEARCH_MARGIN_Y_FRAC
-)
+from detection import BarDetector
+from capture import ScreenCapture, find_game_window
+from config import SEARCH_MARGIN_X_FRAC, SEARCH_MARGIN_Y_FRAC
 
 # DPI awareness
 try:

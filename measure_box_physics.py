@@ -26,9 +26,11 @@ import csv
 # DPI awareness
 ctypes.windll.shcore.SetProcessDpiAwareness(2)
 
-# Import fish.py detection components
+# Import detection components
 sys.path.insert(0, '.')
-from fish import BarDetector, ScreenCapture, find_game_window, CONTROL_HZ
+from detection import BarDetector
+from capture import ScreenCapture, find_game_window
+from config import CONTROL_HZ
 
 import pydirectinput
 pydirectinput.PAUSE = 0.0

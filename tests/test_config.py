@@ -9,7 +9,7 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from fish import (
+from config import (
     BLUE_H_MIN, BLUE_H_MAX, BLUE_S_MIN, BLUE_V_MIN,
     WHITE_BOX_SAT_THRESHOLD,
     FISH_BRIGHTNESS_DROP,
@@ -18,8 +18,8 @@ from fish import (
     CAST_DELAY, BITE_WAIT, MINIGAME_GRACE, CAST_WAIT_POLL,
     BAR_APPEAR_DELAY, CONTROL_HZ, BAR_REDETECT_INTERVAL,
     SEARCH_MARGIN_X_FRAC, SEARCH_MARGIN_Y_FRAC,
-    FishingController,
 )
+from control import FishingController
 
 
 class TestDetectionThresholds:

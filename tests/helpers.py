@@ -8,7 +8,9 @@ import numpy as np
 # Ensure the project root is importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from fish import BarDetector, FishingController, GameState, SEARCH_MARGIN_X_FRAC, SEARCH_MARGIN_Y_FRAC
+from detection import BarDetector, detect_on_frame  # noqa: F401
+from control import FishingController, GameState  # noqa: F401
+from config import SEARCH_MARGIN_X_FRAC, SEARCH_MARGIN_Y_FRAC  # noqa: F401
 
 # ── Paths ──────────────────────────────────────────────────────────────
 PROJECT_ROOT = os.path.join(os.path.dirname(__file__), '..')
@@ -32,30 +34,6 @@ def load_frame(frame_dir, frame_name):
     if not os.path.exists(fpath):
         return None
     return cv2.imread(fpath)
-
-
-def detect_on_frame(img, detector=None):
-    """Run full detection pipeline on an image: find_bar + detect_elements.
-
-    Returns (detector, result) or (None, None) if bar not found.
-    """
-    if detector is None:
-        detector = BarDetector()
-    h, w = img.shape[:2]
-    cx, cy = w // 2, h // 2
-    mx = int(w * SEARCH_MARGIN_X_FRAC)
-    my = int(h * SEARCH_MARGIN_Y_FRAC)
-    roi = img[cy - my:cy + my, cx - mx:cx + mx]
-    if not detector.find_bar(roi):
-        return None, None
-    detector.col_x1 += cx - mx
-    detector.col_x2 += cx - mx
-    detector.col_y1 += cy - my
-    detector.col_y2 += cy - my
-    detector.prog_x1 += cx - mx
-    detector.prog_x2 += cx - mx
-    result = detector.detect_elements(img)
-    return detector, result
 
 
 def create_synthetic_bar_image(width=100, height=600, bar_x=40, bar_w=12,

@@ -10,7 +10,7 @@ import cv2
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from fish import BarDetector, SEARCH_MARGIN_X_FRAC, SEARCH_MARGIN_Y_FRAC
+from detection import BarDetector, detect_on_frame
 
 FRAME_DIR_1 = '2026-03-29 23-47-40'
 
@@ -47,21 +47,9 @@ def _load_frame(fpath):
     img = cv2.imread(fpath)
     if img is None:
         return None, None
-    det = BarDetector()
-    h, w = img.shape[:2]
-    cx, cy = w // 2, h // 2
-    mx = int(w * SEARCH_MARGIN_X_FRAC)
-    my = int(h * SEARCH_MARGIN_Y_FRAC)
-    roi = img[cy - my:cy + my,
-              cx - mx:cx + mx]
-    if not det.find_bar(roi):
+    det, _result = detect_on_frame(img)
+    if det is None:
         return None, None
-    det.col_x1 += cx - mx
-    det.col_x2 += cx - mx
-    det.col_y1 += cy - my
-    det.col_y2 += cy - my
-    det.prog_x1 += cx - mx
-    det.prog_x2 += cx - mx
     return det, img
 
 

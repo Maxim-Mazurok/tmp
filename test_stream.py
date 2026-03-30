@@ -16,7 +16,8 @@ import numpy as np
 import cv2
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from fish import BarDetector, SEARCH_MARGIN_X_FRAC, SEARCH_MARGIN_Y_FRAC
+from detection import BarDetector
+from config import SEARCH_MARGIN_X_FRAC, SEARCH_MARGIN_Y_FRAC
 
 RESULTS_FILE = 'calibration_results.json'
 FPS = 60  # approximate frame rate for dt computation

@@ -3,22 +3,25 @@ import cv2
 import numpy as np
 import sys
 sys.path.insert(0, '.')
-from fish import BarDetector, SEARCH_MARGIN_X, SEARCH_MARGIN_Y
+from detection import BarDetector
+from config import SEARCH_MARGIN_X_FRAC, SEARCH_MARGIN_Y_FRAC
 
 img = cv2.imread('live_screenshot.png')
 h, w = img.shape[:2]
 cx, cy = w // 2, h // 2
-roi = img[cy - SEARCH_MARGIN_Y:cy + SEARCH_MARGIN_Y,
-          cx - SEARCH_MARGIN_X:cx + SEARCH_MARGIN_X]
+mx = int(w * SEARCH_MARGIN_X_FRAC)
+my = int(h * SEARCH_MARGIN_Y_FRAC)
+roi = img[cy - my:cy + my,
+          cx - mx:cx + mx]
 
 det = BarDetector()
 det.find_bar(roi)
-det.col_x1 += cx - SEARCH_MARGIN_X
-det.col_x2 += cx - SEARCH_MARGIN_X
-det.col_y1 += cy - SEARCH_MARGIN_Y
-det.col_y2 += cy - SEARCH_MARGIN_Y
-det.prog_x1 += cx - SEARCH_MARGIN_X
-det.prog_x2 += cx - SEARCH_MARGIN_X
+det.col_x1 += cx - mx
+det.col_x2 += cx - mx
+det.col_y1 += cy - my
+det.col_y2 += cy - my
+det.prog_x1 += cx - mx
+det.prog_x2 += cx - mx
 
 print(f"Bar: x=[{det.col_x1},{det.col_x2}] y=[{det.col_y1},{det.col_y2}]")
 print(f"Width: {det.col_x2-det.col_x1+1}, Height: {det.col_y2-det.col_y1+1}")
