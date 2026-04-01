@@ -1,5 +1,7 @@
 .venv/
 __pycache__/
+.pytest_cache/
+.benchmarks/
 
 # Recorded videos and extracted frames
 *.mp4
@@ -15,3 +17,6 @@ test_overlap.py
 test_perframe.py
 verify_fixes.py
 live_debug_runs
+live_physics_calibration/
+diag_blue_gone/
+annotated_live_crops/

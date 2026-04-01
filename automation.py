@@ -5,6 +5,8 @@ import os
 import sys
 import time
 import signal
+import queue
+import threading
 import traceback
 import ctypes
 from collections import deque
@@ -44,6 +46,96 @@ LIVE_DEBUG_OVERLAP_MARGIN = 0.03
 LIVE_DEBUG_JUMP_THRESHOLD = 0.05
 LIVE_DEBUG_DUMP_COOLDOWN = 45
 PROJECTION_SUMMARY_WRITE_INTERVAL = 25
+_FILE_WRITE_SENTINEL = object()
+
+
+def _ensure_parent_dir(path):
+    """Create the parent directory for a file path when needed."""
+    parent_dir = os.path.dirname(path)
+    if parent_dir:
+        os.makedirs(parent_dir, exist_ok=True)
+
+
+def _append_text_line(path, line):
+    """Append a single line of UTF-8 text to a file."""
+    _ensure_parent_dir(path)
+    with open(path, 'a', encoding='utf-8') as handle:
+        handle.write(line)
+
+
+def _write_json_file(path, payload, indent=2):
+    """Write a JSON payload to disk."""
+    _ensure_parent_dir(path)
+    with open(path, 'w', encoding='utf-8') as handle:
+        json.dump(payload, handle, indent=indent)
+
+
+def _write_image_file(path, image, params=None):
+    """Write an image to disk and raise if OpenCV cannot persist it."""
+    _ensure_parent_dir(path)
+    if params is None:
+        ok = cv2.imwrite(path, image)
+    else:
+        ok = cv2.imwrite(path, image, list(params))
+    if not ok:
+        raise IOError(f'Could not write image to {path}')
+
+
+class _AsyncFileWriter:
+    """Serialize disk writes on a background thread so the control loop never waits on I/O."""
+
+    def __init__(self, worker_name='fish-disk-writer'):
+        self._queue = queue.Queue()
+        self._closed = False
+        self._thread = threading.Thread(target=self._run, name=worker_name, daemon=True)
+        self._thread.start()
+
+    def submit(self, func, *args, **kwargs):
+        """Queue a write task for background execution."""
+        if self._closed:
+            raise RuntimeError('Async file writer is closed')
+        self._queue.put((func, args, kwargs))
+
+    def append_line(self, path, line):
+        """Queue a text append operation."""
+        self.submit(_append_text_line, path, line)
+
+    def write_json(self, path, payload, indent=2):
+        """Queue a JSON file rewrite."""
+        self.submit(_write_json_file, path, payload, indent)
+
+    def write_image(self, path, image, params=None):
+        """Queue an image write using a detached copy of the frame."""
+        image_copy = image.copy()
+        params_copy = None if params is None else list(params)
+        self.submit(_write_image_file, path, image_copy, params_copy)
+
+    def flush(self):
+        """Block until all queued writes are finished."""
+        self._queue.join()
+
+    def close(self):
+        """Flush queued writes and stop the worker thread."""
+        if self._closed:
+            return
+        self.flush()
+        self._closed = True
+        self._queue.put((_FILE_WRITE_SENTINEL, (), {}))
+        self._thread.join()
+
+    def _run(self):
+        """Process queued disk writes until shutdown."""
+        while True:
+            func, args, kwargs = self._queue.get()
+            try:
+                if func is _FILE_WRITE_SENTINEL:
+                    return
+                func(*args, **kwargs)
+            except Exception as exc:
+                print(f"[!] Async file write failed: {type(exc).__name__}: {exc}", file=sys.stderr)
+                traceback.print_exc()
+            finally:
+                self._queue.task_done()
 
 
 def _setup_topmost_window(window_name):
@@ -218,7 +310,18 @@ def _create_live_debug_recorder(enabled):
         'projection_pending': [],
         'projection_frames': {},
         'projection_outcomes': [],
+        'writer': _AsyncFileWriter(),
+        'closed': False,
     }
+
+
+def _finalize_live_debug_recorder(recorder, controller):
+    """Flush queued debug writes and stop the background writer."""
+    if recorder is None or recorder.get('closed'):
+        return
+    _write_projection_summary(recorder, controller)
+    recorder['writer'].close()
+    recorder['closed'] = True
 
 
 def _build_projection_actual_frame(state_ctx, detector):
@@ -242,8 +345,7 @@ def _write_projection_summary(recorder, controller):
         control_hz=CONTROL_HZ,
     )
     summary['session_dir'] = recorder['session_dir']
-    with open(recorder['projection_summary_path'], 'w', encoding='utf-8') as handle:
-        json.dump(summary, handle, indent=2)
+    recorder['writer'].write_json(recorder['projection_summary_path'], summary, indent=2)
 
 
 def _update_projection_calibration(state_ctx, detector, controller):
@@ -279,8 +381,7 @@ def _update_projection_calibration(state_ctx, detector, controller):
             continue
 
         recorder['projection_outcomes'].append(outcome)
-        with open(recorder['projection_path'], 'a', encoding='utf-8') as handle:
-            handle.write(json.dumps(outcome) + '\n')
+        recorder['writer'].append_line(recorder['projection_path'], json.dumps(outcome) + '\n')
 
         if len(recorder['projection_outcomes']) % PROJECTION_SUMMARY_WRITE_INTERVAL == 0:
             _write_projection_summary(recorder, controller)
@@ -338,8 +439,7 @@ def _record_live_debug_frame(state_ctx, detector, controller, raw_img, debug_img
     }
     recorder['last_note'] = None
 
-    with open(recorder['telemetry_path'], 'a', encoding='utf-8') as handle:
-        handle.write(json.dumps(telemetry) + '\n')
+    recorder['writer'].append_line(recorder['telemetry_path'], json.dumps(telemetry) + '\n')
 
     recorder['buffer'].append({
         'frame': telemetry['frame'],
@@ -391,14 +491,13 @@ def _dump_live_debug_buffer(state_ctx, reason):
     recorder['dump_count'] += 1
     dump_name = f"{recorder['dump_count']:03d}_{frame_index:05d}_{reason}"
     dump_dir = os.path.join(recorder['events_dir'], dump_name)
-    os.makedirs(dump_dir, exist_ok=True)
 
     frames = list(recorder['buffer'])[-LIVE_DEBUG_DUMP_FRAMES:]
     for item in frames:
         stem = f"{item['frame']:05d}"
-        cv2.imwrite(os.path.join(dump_dir, f'{stem}_raw.png'), item['raw_img'])
+        recorder['writer'].write_image(os.path.join(dump_dir, f'{stem}_raw.png'), item['raw_img'])
         if item['debug_img'] is not None:
-            cv2.imwrite(os.path.join(dump_dir, f'{stem}_debug.png'), item['debug_img'])
+            recorder['writer'].write_image(os.path.join(dump_dir, f'{stem}_debug.png'), item['debug_img'])
 
     summary = {
         'reason': reason,
@@ -407,10 +506,9 @@ def _dump_live_debug_buffer(state_ctx, reason):
         'session_dir': recorder['session_dir'],
         'telemetry_tail': [item['telemetry'] for item in frames[-10:]],
     }
-    with open(os.path.join(dump_dir, 'summary.json'), 'w', encoding='utf-8') as handle:
-        json.dump(summary, handle, indent=2)
+    recorder['writer'].write_json(os.path.join(dump_dir, 'summary.json'), summary, indent=2)
 
-    print(f"[!] Live debug dump saved: {dump_dir}")
+    print(f"[!] Live debug dump queued: {dump_dir}")
 
 
 def _set_detector_note(state_ctx, note):
@@ -555,9 +653,13 @@ def _check_blue_bar_gone(state_ctx, col_strip, blue_ratio, catch_allowed):
         state_ctx['low_blue_count'] += 1
         if state_ctx['low_blue_count'] == 1:
             diag_dir = os.path.join(os.path.dirname(__file__), 'diag_blue_gone')
-            os.makedirs(diag_dir, exist_ok=True)
-            cv2.imwrite(os.path.join(diag_dir, 'first_low.png'), state_ctx['img'])
-            cv2.imwrite(os.path.join(diag_dir, 'first_low_strip.png'), col_strip)
+            recorder = state_ctx.get('debug_recorder')
+            if recorder is not None:
+                recorder['writer'].write_image(os.path.join(diag_dir, 'first_low.png'), state_ctx['img'])
+                recorder['writer'].write_image(os.path.join(diag_dir, 'first_low_strip.png'), col_strip)
+            else:
+                _write_image_file(os.path.join(diag_dir, 'first_low.png'), state_ctx['img'])
+                _write_image_file(os.path.join(diag_dir, 'first_low_strip.png'), col_strip)
             print(f"[!] First low-blue frame: ratio={blue_ratio:.1%} "
                   f"strip={col_strip.shape} region={state_ctx['region']}")
     else:
@@ -578,10 +680,14 @@ def _check_blue_bar_gone(state_ctx, col_strip, blue_ratio, catch_allowed):
             return True
         print(f"[*] Blue bar gone ({state_ctx['low_blue_count']} frames, ratio={blue_ratio:.1%}). Fish caught!")
         diag_dir = os.path.join(os.path.dirname(__file__), 'diag_blue_gone')
-        os.makedirs(diag_dir, exist_ok=True)
-        cv2.imwrite(os.path.join(diag_dir, 'capture.png'), state_ctx['img'])
-        cv2.imwrite(os.path.join(diag_dir, 'col_strip.png'), col_strip)
-        print(f"[!] Diagnostic images saved to {diag_dir}/ "
+        recorder = state_ctx.get('debug_recorder')
+        if recorder is not None:
+            recorder['writer'].write_image(os.path.join(diag_dir, 'capture.png'), state_ctx['img'])
+            recorder['writer'].write_image(os.path.join(diag_dir, 'col_strip.png'), col_strip)
+        else:
+            _write_image_file(os.path.join(diag_dir, 'capture.png'), state_ctx['img'])
+            _write_image_file(os.path.join(diag_dir, 'col_strip.png'), col_strip)
+        print(f"[!] Diagnostic images queued to {diag_dir}/ "
               f"(capture={state_ctx['img'].shape}, strip={col_strip.shape}, "
               f"region={state_ctx['region']})")
         state_ctx['state'] = GameState.CAUGHT
@@ -791,8 +897,7 @@ def run_automation(debug=False, reel_only=False):
         state_ctx['running'] = False
         if controller.space_held:
             pydirectinput.keyUp('space')
-        if state_ctx['debug_recorder'] is not None:
-            _write_projection_summary(state_ctx['debug_recorder'], controller)
+        _finalize_live_debug_recorder(state_ctx['debug_recorder'], controller)
         sys.exit(0)
     signal.signal(signal.SIGINT, signal_handler)
 
@@ -817,7 +922,7 @@ def run_automation(debug=False, reel_only=False):
     if controller.space_held:
         pydirectinput.keyUp('space')
     if state_ctx['debug_recorder'] is not None:
-        _write_projection_summary(state_ctx['debug_recorder'], controller)
+        _finalize_live_debug_recorder(state_ctx['debug_recorder'], controller)
         print(f"[*] Projection calibration summary: {state_ctx['debug_recorder']['projection_summary_path']}")
     if debug:
         cv2.destroyAllWindows()

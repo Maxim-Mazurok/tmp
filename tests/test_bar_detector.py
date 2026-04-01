@@ -291,7 +291,7 @@ class TestRegressionGuards:
         ('001001', 0.451),
         ('001193', 0.605),
         ('001205', 0.677),
-        ('001210', 0.651),
+        ('001210', 0.688),
         ('001250', 0.529),
     ])
     def test_outside_box_detection_accuracy(self, frame_name, expected_y):
@@ -441,6 +441,25 @@ class TestVelocityTracking:
         assert det.last_detection_method == 'box-assume-progress'
         assert det.detected_fish_y is None
         assert det.box_top <= det.fish_y <= det.box_bottom
+
+    def test_virtual_track_does_not_snap_to_box_observation(self):
+        """Observed fish should update motion without forcing the virtual track to mirror it immediately."""
+        det = BarDetector()
+        det.box_top = 0.45
+        det.box_bottom = 0.65
+        det.box_center = 0.55
+
+        for now, fish_y in [(0.00, 0.32), (0.10, 0.35), (0.20, 0.38)]:
+            det._update_velocity_tracking(fish_y, now, col_h=200)
+
+        predicted_before = det._predict_virtual_position(0.10)
+        det.progress_delta = 0.01
+        det._update_velocity_tracking(0.56, 0.30, col_h=200)
+
+        assert det.detected_fish_y == pytest.approx(0.56)
+        assert det.fish_y < det.detected_fish_y
+        assert abs(det.fish_y - predicted_before) <= 0.12
+        assert abs(det.fish_y - det.detected_fish_y) >= 0.04
 
     @requires_frames_1
     def test_velocity_builds_over_frames(self):

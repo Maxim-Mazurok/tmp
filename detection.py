@@ -44,6 +44,12 @@ class BarDetector:
     OBSERVATION_JUMP_LIMIT = 0.08
     OBSERVATION_BLEND_LIMIT = 0.14
     VIRTUAL_FISH_MAX_DT = 0.20
+    VIRTUAL_TRACK_MIN_STEP = 0.002
+    VIRTUAL_TRACK_CORRECTION_RATE = 0.16
+    VIRTUAL_TRACK_CONFIDENT_RATE = 0.28
+    VIRTUAL_TRACK_INSIDE_BOX_RATE = 0.10
+    VIRTUAL_TRACK_PROGRESS_RATE = 0.08
+    VIRTUAL_TRACK_REENTRY_RATE = 1.10
     BOX_INFERENCE_MARGIN_FRAC = 0.18
     BOX_INFERENCE_BIAS = 0.55
     BOX_PROGRESS_BIAS = 0.82
@@ -100,6 +106,7 @@ class BarDetector:
         self.last_detection_method = 'none'
         self.last_match_score = 0.0
         self.last_shape_score = 0.0
+        self._outside_dip_strength = 0.0
         self.last_tracker_y = None
         self.last_detection_confident = False
         self._load_bootstrap_template()
@@ -327,11 +334,11 @@ class BarDetector:
 
         # Pass 1: detect fish OUTSIDE white box (high-confidence)
         new_fish_y = self._detect_fish_outside_box(
-            dips, row_sat, white_box_rows, col_h, fish_min_cluster, fish_gap
+            smoothed, row_sat, white_box_rows, col_h, fish_min_cluster, fish_gap
         )
         if new_fish_y is not None:
             self.last_detection_method = 'outside-dip'
-            self.last_match_score = 1.0
+            self.last_match_score = min(1.0, 0.5 + 0.5 * self._outside_dip_strength / (2 * FISH_BRIGHTNESS_DROP))
             self.last_shape_score = 0.0
             self.last_detection_confident = True
             self._update_fish_template(gray, new_fish_y, col_h, source='outside-dip')
@@ -373,9 +380,36 @@ class BarDetector:
 
         return new_fish_y
 
-    def _detect_fish_outside_box(self, dips, row_sat, white_box_rows, col_h,
+    def _detect_fish_outside_box(self, smoothed, row_sat, white_box_rows, col_h,
                                  fish_min_cluster, fish_gap):
         """Pass 1: Detect fishscale outside the white box using brightness dips + high saturation."""
+        # Compute box-corrected dips.  The global baseline (uniform_filter1d
+        # with a large window) bleeds the bright white-box signal many rows
+        # beyond the box edges, creating strong false dip artifacts.  We
+        # replace the box region with a linear interpolation before computing
+        # the baseline so dip values near the box reflect the real background.
+        has_box = self.box_bottom > self.box_top and bool(white_box_rows)
+        window = max(5, col_h // 3)
+        if window % 2 == 0:
+            window += 1
+        if has_box:
+            # Extend interpolation beyond box boundaries to cover the full
+            # brightness transition zone.  The smoothing kernel spreads the
+            # box-edge step over several additional rows, so anchors must
+            # sit at true background level.
+            transition_margin = max(6, int(col_h * 0.03))
+            interp_start = max(1, int(self.box_top * col_h) - transition_margin)
+            interp_end = min(col_h - 2, int(self.box_bottom * col_h) + transition_margin)
+            corrected = smoothed.copy()
+            corrected[interp_start:interp_end + 1] = np.linspace(
+                corrected[interp_start - 1], corrected[interp_end + 1],
+                interp_end - interp_start + 1
+            )
+            local_avg = uniform_filter1d(corrected, size=window)
+        else:
+            local_avg = uniform_filter1d(smoothed, size=window)
+        dips = smoothed - local_avg
+
         dark_rows = np.where(dips < -FISH_BRIGHTNESS_DROP)[0]
         margin = max(3, int(col_h * 0.05))
         dark_rows = dark_rows[
@@ -393,6 +427,7 @@ class BarDetector:
         dr_diffs = np.diff(dark_rows)
         dr_splits = np.where(dr_diffs > fish_gap)[0]
         dr_clusters = np.split(dark_rows, dr_splits + 1)
+
         best_cluster = None
         best_dip = 0
         for c in dr_clusters:
@@ -403,7 +438,9 @@ class BarDetector:
                     best_cluster = c
         if best_cluster is not None:
             fish_center = (best_cluster[0] + best_cluster[-1]) / 2
+            self._outside_dip_strength = best_dip
             return fish_center / col_h
+        self._outside_dip_strength = 0.0
         return None
 
     def _detect_fish_inside_box_legacy(self, smoothed, col_h, fish_gap):
@@ -753,6 +790,7 @@ class BarDetector:
 
     def _update_velocity_tracking(self, new_fish_y, now, col_h):
         """Update observed and inferred fish motion state."""
+        dt = 0.0
         predicted_y = self.fish_y
         if self.last_fish_update_time is not None:
             dt = max(0.0, min(now - self.last_fish_update_time, self.VIRTUAL_FISH_MAX_DT))
@@ -771,7 +809,7 @@ class BarDetector:
 
             self.detected_fish_y = new_fish_y
             self.fish_missing_frames = 0
-            self.fish_y = self._resolve_virtual_observation(new_fish_y, predicted_y)
+            self.fish_y = self._resolve_virtual_observation(new_fish_y, predicted_y, dt)
             if abs(self.fish_y - new_fish_y) <= 0.01:
                 self.virtual_fish_source = self.last_detection_method
             else:
@@ -933,18 +971,54 @@ class BarDetector:
         """Check whether a position is plausibly inside the white box region."""
         return self.box_top - margin <= y_value <= self.box_bottom + margin
 
-    def _resolve_virtual_observation(self, observed_y, predicted_y):
-        """Blend weak detections with the prior virtual track instead of hard-snapping."""
-        confidence = self._observation_confidence(self.last_detection_method)
-        if self.last_fish_update_time is None or confidence >= 0.95:
+    def _observation_correction_rate(self, observed_y):
+        """Return how quickly the virtual fish may be pulled toward an observation."""
+        method = self.last_detection_method
+        if method == 'outside-dip':
+            rate = self.VIRTUAL_TRACK_CONFIDENT_RATE
+        elif method == 'inside-template':
+            rate = 0.18
+        elif method == 'tracker-flow':
+            rate = 0.14
+        elif method == 'inside-legacy':
+            rate = 0.10
+        else:
+            rate = self.VIRTUAL_TRACK_CORRECTION_RATE
+
+        if self._near_or_inside_box(observed_y, margin=0.02):
+            rate = min(rate, self.VIRTUAL_TRACK_INSIDE_BOX_RATE)
+        if self.progress_delta > self.PROGRESS_RISE_THRESHOLD:
+            rate = min(rate, self.VIRTUAL_TRACK_PROGRESS_RATE)
+        return rate
+
+    def _bounded_virtual_correction(self, predicted_y, observed_y, dt):
+        """Nudge the virtual fish toward an observation without letting it mirror frame noise."""
+        delta = observed_y - predicted_y
+        if abs(delta) <= 1e-6:
             return max(0.0, min(1.0, observed_y))
 
-        if self._near_or_inside_box(observed_y, margin=0.0) and not self._near_or_inside_box(predicted_y, margin=0.02):
+        rate = self._observation_correction_rate(observed_y)
+        if self._near_or_inside_box(observed_y, margin=0.0) and not self._near_or_inside_box(predicted_y, margin=0.0):
+            rate = max(rate, self.VIRTUAL_TRACK_REENTRY_RATE)
+        max_step = max(self.VIRTUAL_TRACK_MIN_STEP, rate * max(dt, 1.0 / 60.0))
+        correction = np.sign(delta) * min(abs(delta), max_step)
+        return max(0.0, min(1.0, predicted_y + correction))
+
+    def _resolve_virtual_observation(self, observed_y, predicted_y, dt):
+        """Blend weak detections with the prior virtual track instead of hard-snapping."""
+        confidence = self._observation_confidence(self.last_detection_method)
+        if self.last_fish_update_time is None:
             return max(0.0, min(1.0, observed_y))
+
+        if confidence >= 0.95:
+            return self._bounded_virtual_correction(predicted_y, observed_y, dt)
+
+        if self._near_or_inside_box(observed_y, margin=0.0) and not self._near_or_inside_box(predicted_y, margin=0.0):
+            return self._bounded_virtual_correction(predicted_y, observed_y, dt)
 
         delta = observed_y - predicted_y
         if abs(delta) <= self.OBSERVATION_JUMP_LIMIT:
-            return max(0.0, min(1.0, observed_y))
+            return self._bounded_virtual_correction(predicted_y, observed_y, dt)
 
         if abs(delta) <= self.OBSERVATION_BLEND_LIMIT:
             blend = 0.35 + 0.5 * confidence
@@ -957,7 +1031,7 @@ class BarDetector:
             if box_target is not None:
                 resolved = 0.4 * resolved + 0.6 * box_target
 
-        return max(0.0, min(1.0, resolved))
+        return self._bounded_virtual_correction(predicted_y, resolved, dt)
 
     def _infer_missing_fish(self, predicted_y):
         """Infer the fish position across ambiguous frames without letting it teleport."""
@@ -1025,18 +1099,18 @@ class BarDetector:
         box_y2 = cy1 + int(self.box_bottom * col_h)
         cv2.rectangle(vis, (cx1, box_y1), (cx2, box_y2), (255, 255, 255), 2)
 
-        # Draw the controller-facing virtual fish track (green).
+        # Draw the controller-facing virtual fish track on the right half of the bar.
         virtual_abs_y = cy1 + int(self.fish_y * col_h)
-        cv2.line(vis, (cx1 - 8, virtual_abs_y), (cx2 + 8, virtual_abs_y), (0, 255, 0), 3)
+        cv2.line(vis, (cx1, virtual_abs_y), (cx2 + 8, virtual_abs_y), (0, 255, 0), 3)
 
         # Draw the carry-forward inference from prior speed and direction (orange).
         inferred_abs_y = cy1 + int(self.inferred_fish_y * col_h)
         cv2.line(vis, (cx1 - 3, inferred_abs_y), (cx2 + 3, inferred_abs_y), (0, 165, 255), 1)
 
-        # Draw the directly observed fish position for this frame (red) when available.
+        # Draw the directly observed fish position on the left half of the bar.
         if self.detected_fish_y is not None:
             observed_abs_y = cy1 + int(self.detected_fish_y * col_h)
-            cv2.line(vis, (cx1 - 8, observed_abs_y), (cx2 + 8, observed_abs_y), (0, 0, 255), 3)
+            cv2.line(vis, (cx1 - 8, observed_abs_y), (cx2, observed_abs_y), (0, 0, 255), 3)
 
         # Draw progress bar bounds
         px1, px2 = self.prog_x1, self.prog_x2
