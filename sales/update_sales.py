@@ -4,6 +4,7 @@ import re
 from collections import Counter
 from itertools import combinations
 from pathlib import Path
+from typing import TypedDict
 
 SALES_DIR = Path(__file__).parent
 REGIONS = {
@@ -15,7 +16,13 @@ REGIONS = {
     "humane-labs": "Humane Labs",
 }
 
-BUNDLES = {
+
+class BundleInfo(TypedDict):
+    fish: list[str]
+    bonus: int
+
+
+BUNDLES: dict[str, BundleInfo] = {
     "Bronze Multizone #1": {"fish": ["Dutch Fish", "Ocean Perch", "Broadbill"], "bonus": 10750},
     "Bronze Multizone #2": {"fish": ["Brook Trout", "Pufferfish", "Green Eel"], "bonus": 11000},
     "Silver Multizone #1": {"fish": ["Swordfish", "Blue Warehou", "Stingray"], "bonus": 12500},
@@ -143,6 +150,12 @@ TIER_PRICES = {
     "Humane Labs":  {1: 2150, 2: 2500, 3: 2850},
 }
 
+# Time per fish (seconds)
+SECONDS_WAITING_FOR_BITE = 100  # decreases with level ups
+SECONDS_REELING_IN = 15         # improves with skill
+SECONDS_PER_FISH = SECONDS_WAITING_FOR_BITE + SECONDS_REELING_IN
+FISH_PER_HOUR = 3600 / SECONDS_PER_FISH
+
 # Reverse lookup: fish name -> list of bundle names
 FISH_BUNDLES: dict[str, list[str]] = {}
 for bname, binfo in BUNDLES.items():
@@ -164,34 +177,71 @@ def parse_log(path: Path) -> Counter:
     return totals
 
 
+def _stars_string(name: str) -> str:
+    """Return the star display string for a fish name."""
+    if name not in PRICES:
+        return "?"
+    _price, star_count, color = PRICES[name]
+    if star_count == 0:
+        return "-"
+    result = "\u2605" * star_count
+    if color:
+        result += f" {color}"
+    return result
+
+
+def _stars_sort_key(name: str) -> tuple[int, str]:
+    """Return (star_count, color) for sorting. Higher stars first, green last."""
+    if name not in PRICES:
+        return (0, "")
+    _price, star_count, color = PRICES[name]
+    return (star_count, color)
+
+
 def build_table(counts: Counter) -> str:
-    """Build a padded markdown table sorted alphabetically with bundles column."""
-    rows = sorted(counts.items(), key=lambda x: x[0])
+    """Build a padded markdown table sorted by stars (desc) then % (desc)."""
     total = sum(counts.values())
 
-    # Prepare data rows: (name, count_str, pct_str, bundles_str)
-    data = []
-    for name, count in rows:
-        pct = count / total * 100
+    # Prepare data rows: (name, count, pct, bundles_str, stars_str)
+    raw_rows = []
+    for name, count in counts.items():
+        percentage = count / total * 100
         bundles = ", ".join(FISH_BUNDLES.get(name, []))
-        data.append((name, str(count), f"{pct:.1f}%", bundles))
-    total_row = ("**Total**", f"**{total}**", "**100%**", "")
+        stars = _stars_string(name)
+        star_count, color = _stars_sort_key(name)
+        raw_rows.append((name, count, percentage, bundles, stars, star_count, color))
+
+    # Sort: stars desc, green after regular, then % desc
+    raw_rows.sort(key=lambda row: (-row[5], row[6], -row[2]))
+
+    data = [
+        (name, str(count), f"{percentage:.1f}%", stars, bundles)
+        for name, count, percentage, bundles, stars, _star_count, _color in raw_rows
+    ]
+    total_row = ("**Total**", f"**{total}**", "**100%**", "", "")
 
     # Column widths
-    w_name = max(len("Fish"), max(len(r[0]) for r in data), len(total_row[0]))
-    w_count = max(len("Count"), max(len(r[1]) for r in data), len(total_row[1]))
-    w_pct = max(len("%"), max(len(r[2]) for r in data), len(total_row[2]))
-    w_bun = max(len("Bundles"), max((len(r[3]) for r in data), default=0), len(total_row[3]))
+    w_name = max(len("Fish"), max(len(row[0]) for row in data), len(total_row[0]))
+    w_count = max(len("Count"), max(len(row[1]) for row in data), len(total_row[1]))
+    w_pct = max(len("%"), max(len(row[2]) for row in data), len(total_row[2]))
+    w_stars = max(len("Stars"), max(len(row[3]) for row in data), len(total_row[3]))
+    w_bun = max(len("Bundles"), max((len(row[4]) for row in data), default=0), len(total_row[4]))
 
-    def fmt(n: str, c: str, p: str, b: str) -> str:
-        return f"| {n:<{w_name}} | {c:>{w_count}} | {p:>{w_pct}} | {b:<{w_bun}} |"
+    def fmt(name: str, count: str, percentage: str, stars: str, bundles: str) -> str:
+        return (
+            f"| {name:<{w_name}} | {count:>{w_count}} | {percentage:>{w_pct}}"
+            f" | {stars:<{w_stars}} | {bundles:<{w_bun}} |"
+        )
 
     lines = [
-        fmt("Fish", "Count", "%", "Bundles"),
-        f"|{'-' * (w_name + 2)}|{'-' * (w_count + 1)}:|{'-' * (w_pct + 1)}:|{'-' * (w_bun + 2)}|",
+        fmt("Fish", "Count", "%", "Stars", "Bundles"),
+        (
+            f"|{'-' * (w_name + 2)}|{'-' * (w_count + 1)}:|{'-' * (w_pct + 1)}:"
+            f"|{'-' * (w_stars + 2)}|{'-' * (w_bun + 2)}|"
+        ),
     ]
-    for name, count_s, pct_s, bun_s in data:
-        lines.append(fmt(name, count_s, pct_s, bun_s))
+    for row in data:
+        lines.append(fmt(*row))
     lines.append(fmt(*total_row))
     return "\n".join(lines)
 
@@ -316,7 +366,7 @@ def build_comparison_table() -> str:
         # to completing it. The bottleneck is the rarest fish in the bundle.
         # Expected completions per N fish ≈ min(probability_i) * N for each bundle.
         # So bundle value per fish = sum(min_prob * bonus) for each available bundle.
-        bundle_value_per_fish = 0
+        bundle_value_per_fish = 0.0
         available_bundles = []
         for bundle_name, bundle_info in BUNDLES.items():
             fish_probabilities = []
@@ -334,6 +384,7 @@ def build_comparison_table() -> str:
         total_value_per_fish = sale_value_per_fish + bundle_value_per_fish
 
         bundles_string = ", ".join(available_bundles) if available_bundles else "none"
+        revenue_per_hour = total_value_per_fish * FISH_PER_HOUR
 
         rows.append((
             region_name,
@@ -342,6 +393,7 @@ def build_comparison_table() -> str:
             bundles_string,
             f"${bundle_value_per_fish:,.0f}",
             f"**${total_value_per_fish:,.0f}**",
+            f"${revenue_per_hour:,.0f}",
         ))
 
     if not rows:
@@ -350,7 +402,9 @@ def build_comparison_table() -> str:
     headers = (
         "Location", "Fish Caught", "$/Fish (sales)",
         "Available Bundles", "$/Fish (bundles)", "$/Fish (total)",
+        "$/Hour",
     )
+    right_aligned_columns = {1, 2, 4, 5, 6}
     widths = [
         max(len(headers[column]), max(len(row[column]) for row in rows))
         for column in range(len(headers))
@@ -358,14 +412,15 @@ def build_comparison_table() -> str:
 
     def format_row(*values: str) -> str:
         return "| " + " | ".join(
-            f"{value:>{widths[column]}}" if column in (1, 2, 4, 5) else f"{value:<{widths[column]}}"
+            f"{value:>{widths[column]}}" if column in right_aligned_columns
+            else f"{value:<{widths[column]}}"
             for column, value in enumerate(values)
         ) + " |"
 
     lines = [format_row(*headers)]
     separator_parts = []
     for column in range(len(headers)):
-        if column in (1, 2, 4, 5):
+        if column in right_aligned_columns:
             separator_parts.append(f"{'-' * (widths[column] + 1)}:")
         else:
             separator_parts.append(f"{'-' * (widths[column] + 2)}")
@@ -416,12 +471,15 @@ def build_bundle_details(region_counts: dict[str, Counter]) -> str:
                 )
             else:
                 expected_fish = expected_fish_to_complete_bundle(fish_probabilities)
+                expected_time_seconds = expected_fish * SECONDS_PER_FISH
+                expected_time_minutes = expected_time_seconds / 60
                 bonus_per_fish = bundle_info["bonus"] / expected_fish
                 bundle_rows.append((
                     bundle_name,
                     ", ".join(bundle_info["fish"]),
                     f"${bundle_info['bonus']:,}",
                     f"{expected_fish:.0f}",
+                    f"{expected_time_minutes:.0f} min",
                     f"${bonus_per_fish:,.0f}",
                     " \\| ".join(fish_details),
                 ))
@@ -431,16 +489,18 @@ def build_bundle_details(region_counts: dict[str, Counter]) -> str:
 
         headers = (
             "Bundle", "Fish", "Bonus",
-            "Avg Fish to Complete", "Bonus/Fish", "Catch Rates",
+            "Avg Fish to Complete", "Avg Time", "Bonus/Fish", "Catch Rates",
         )
         widths = [
             max(len(headers[column]), max(len(row[column]) for row in bundle_rows))
             for column in range(len(headers))
         ]
 
+        bundle_right_columns = {2, 3, 4, 5}
+
         def format_bundle_row(*values: str) -> str:
             return "| " + " | ".join(
-                f"{value:>{widths[column]}}" if column in (2, 3, 4)
+                f"{value:>{widths[column]}}" if column in bundle_right_columns
                 else f"{value:<{widths[column]}}"
                 for column, value in enumerate(values)
             ) + " |"
@@ -448,7 +508,7 @@ def build_bundle_details(region_counts: dict[str, Counter]) -> str:
         lines = [f"### {region_name}", "", format_bundle_row(*headers)]
         separator_parts = []
         for column in range(len(headers)):
-            if column in (2, 3, 4):
+            if column in bundle_right_columns:
                 separator_parts.append(f"{'-' * (widths[column] + 1)}:")
             else:
                 separator_parts.append(f"{'-' * (widths[column] + 2)}")
@@ -499,7 +559,13 @@ def main() -> None:
                     region_counts[region_name] = counts
 
         bundle_details = build_bundle_details(region_counts)
-        content = f"# Location Comparison\n\n{comparison_table}\n"
+        time_note = (
+            f"Assuming {SECONDS_WAITING_FOR_BITE}s wait for bite"
+            f" + {SECONDS_REELING_IN}s reel-in"
+            f" = {SECONDS_PER_FISH}s per fish"
+            f" ({FISH_PER_HOUR:.1f} fish/hour)."
+        )
+        content = f"# Location Comparison\n\n{time_note}\n\n{comparison_table}\n"
         if bundle_details:
             content += f"\n{bundle_details}\n"
 

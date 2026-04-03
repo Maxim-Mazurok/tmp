@@ -2,21 +2,21 @@
 
 4 batches sold
 
-| Fish             |   Count |        % | Bundles             |
-|------------------|--------:|---------:|---------------------|
-| Albacore         |      12 |    10.0% |                     |
-| Blue Warehou     |      13 |    10.8% | Silver Multizone #1 |
-| Broadbill        |      25 |    20.8% | Bronze Multizone #1 |
-| Flathead         |       2 |     1.7% |                     |
-| Golden Perch     |       2 |     1.7% |                     |
-| Great Barracuda  |       4 |     3.3% |                     |
-| Halibut          |      10 |     8.3% |                     |
-| Morwhong         |       7 |     5.8% | Alamo Starter       |
-| Redfish          |       2 |     1.7% |                     |
-| Scollop          |      14 |    11.7% | Low Level Multizone |
-| Silver Trevally  |       8 |     6.7% | Alamo Starter       |
-| Snow Crab        |       3 |     2.5% |                     |
-| Southern Garfish |       3 |     2.5% |                     |
-| Southern Tuna    |       3 |     2.5% | Alamo Starter       |
-| Trout            |      12 |    10.0% |                     |
-| **Total**        | **120** | **100%** |                     |
+| Fish             |   Count |        % | Stars | Bundles             |
+|------------------|--------:|---------:|-------|---------------------|
+| Silver Trevally  |       8 |     5.4% | ★★★   | Alamo Starter       |
+| Great Barracuda  |       4 |     2.7% | ★★★   |                     |
+| Blue Warehou     |      14 |     9.5% | ★★    | Silver Multizone #1 |
+| Trout            |      12 |     8.2% | ★★    |                     |
+| Southern Garfish |       7 |     4.8% | ★★    |                     |
+| Snow Crab        |       4 |     2.7% | ★★    |                     |
+| Southern Tuna    |       4 |     2.7% | ★★    | Alamo Starter       |
+| Golden Perch     |       2 |     1.4% | ★★    |                     |
+| Broadbill        |      26 |    17.7% | ★     | Bronze Multizone #1 |
+| Albacore         |      17 |    11.6% | ★     |                     |
+| Scollop          |      17 |    11.6% | ★     | Low Level Multizone |
+| Halibut          |      12 |     8.2% | ★     |                     |
+| Morwhong         |       9 |     6.1% | ★     | Alamo Starter       |
+| Redfish          |       6 |     4.1% | ★     |                     |
+| Flathead         |       5 |     3.4% | ★     |                     |
+| **Total**        | **147** | **100%** |       |                     |
