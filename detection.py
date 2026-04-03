@@ -109,6 +109,7 @@ class BarDetector:
         self._outside_dip_strength = 0.0
         self.last_tracker_y = None
         self.last_detection_confident = False
+        self._last_find_bar_diag = ''
         self._load_bootstrap_template()
 
     def find_bar(self, img):
@@ -126,12 +127,18 @@ class BarDetector:
         # from blue sky in daytime scenes.
         img_h, img_w = img.shape[:2]
         min_bar_width = max(2, int(img_w * 0.01))     # ~1.0% of width
-        max_bar_width = max(10, int(img_w * 0.05))     # ~5% of width
+        max_bar_width = max(10, int(img_w * 0.08))     # ~8% of width (bar is wider at low res)
 
         best_group = None
         best_bright_score = 0
 
-        for v_thresh in (200, 150, 100, 75):
+        # Track best candidate for diagnostic logging on failure
+        _diag_best_width = 0
+        _diag_best_height = 0
+        _diag_best_rows = 0
+        _diag_fail_reason = 'no-bright-cols'
+
+        for v_thresh in (200, 150, 100, 75, 50):
             bright_mask = cv2.inRange(
                 hsv,
                 np.array([BLUE_H_MIN, BLUE_S_MIN, v_thresh]),
@@ -159,7 +166,7 @@ class BarDetector:
                 # columns are bright. Try progressively lower V for row extent.
                 strip_hsv = hsv[:, grp[0]:grp[-1] + 1]
                 bar_y1 = bar_y2 = -1
-                for v_min_row in (150, 100, 75):
+                for v_min_row in (150, 100, 75, 50):
                     row_mask = (
                         (strip_hsv[:, :, 0] >= 80) &
                         (strip_hsv[:, :, 0] <= 120) &
@@ -171,20 +178,32 @@ class BarDetector:
                     if len(candidate_rows) < max(4, int(img_h * 0.01)):
                         continue
                     cr_diffs = np.diff(candidate_rows)
-                    row_gap = max(4, int(img_h * 0.015))  # ~1.5% of height
+                    row_gap = max(4, int(img_h * 0.02))  # ~2% of height
                     cr_splits = np.where(cr_diffs > row_gap)[0]
                     cr_groups = np.split(candidate_rows, cr_splits + 1)
                     largest = max(cr_groups, key=len)
-                    min_rows = max(8, int(img_h * 0.12))
+                    min_rows = max(8, int(img_h * 0.08))
                     if len(largest) >= min_rows:
                         bar_y1 = int(largest[0])
                         bar_y2 = int(largest[-1])
                         break
+                    # Track best candidate for diagnostics
+                    if len(largest) > _diag_best_rows:
+                        _diag_best_rows = len(largest)
+                        _diag_best_width = width
+                        _diag_best_height = int(largest[-1]) - int(largest[0])
+                        _diag_fail_reason = f'rows={len(largest)}<{min_rows}'
 
                 if bar_y1 < 0:
+                    if _diag_best_width == 0 and width > 0:
+                        _diag_fail_reason = 'no-row-groups'
                     continue
                 height = bar_y2 - bar_y1
-                if height < width * 8:
+                if height < width * 5:
+                    if height > _diag_best_height:
+                        _diag_best_height = height
+                        _diag_best_width = width
+                        _diag_fail_reason = f'aspect={height}/{width*5}'
                     continue
                 if bright_score > best_bright_score:
                     best_bright_score = bright_score
@@ -197,6 +216,11 @@ class BarDetector:
                 break
 
         if best_group is None:
+            self._last_find_bar_diag = (
+                f'img={img_w}x{img_h} '
+                f'best_candidate=w{_diag_best_width}/h{_diag_best_height}/rows{_diag_best_rows} '
+                f'fail={_diag_fail_reason}'
+            )
             return False
 
         main_group, bar_rows = best_group

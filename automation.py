@@ -588,13 +588,13 @@ def _handle_waiting(state_ctx):
             val_hsv = cv2.cvtColor(val_strip, cv2.COLOR_BGR2HSV)
             val_mask = cv2.inRange(
                 val_hsv,
-                np.array([BLUE_H_MIN, 40, 100]),
+                np.array([BLUE_H_MIN, 25, 50]),
                 np.array([BLUE_H_MAX, 255, 255])
             )
             val_ratio = np.sum(val_mask > 0) / max(val_mask.size, 1)
             bar_w = detector.col_x2 - detector.col_x1
             bar_h = detector.col_y2 - detector.col_y1
-            if val_ratio < 0.70:
+            if val_ratio < 0.40:
                 print(f"[!] Bar rejected: blue ratio {val_ratio:.1%} too low "
                       f"(w={bar_w} h={bar_h} ratio={bar_h/max(bar_w,1):.1f})")
                 detector.bar_found = False
@@ -626,8 +626,13 @@ def _handle_waiting(state_ctx):
     else:
         if debug:
             vis = img.copy()
-            cv2.putText(vis, f"Looking for bar... ({now - state_ctx['state_start']:.0f}s)",
+            diag = getattr(detector, '_last_find_bar_diag', '')
+            elapsed = now - state_ctx['state_start']
+            cv2.putText(vis, f"Looking for bar... ({elapsed:.0f}s)",
                         (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+            if diag:
+                cv2.putText(vis, diag[:80],
+                            (20, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 200, 255), 1)
             show = cv2.resize(vis, (600, 500))
             cv2.imshow(DEBUG_WINDOW_NAME, show)
             if not state_ctx['topmost_set']:
@@ -636,6 +641,15 @@ def _handle_waiting(state_ctx):
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 state_ctx['running'] = False
                 return
+            # Save diagnostic frame on first failure
+            diag_count = state_ctx.get('_diag_save_count', 0)
+            if diag_count < 3:
+                recorder = state_ctx.get('debug_recorder')
+                if recorder:
+                    import os as _os
+                    diag_path = _os.path.join(recorder['session_dir'], f'search_fail_{diag_count:03d}.png')
+                    cv2.imwrite(diag_path, img)
+                state_ctx['_diag_save_count'] = diag_count + 1
         if reel_only:
             time.sleep(0.1)
         else:
