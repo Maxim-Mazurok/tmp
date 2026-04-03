@@ -4,6 +4,7 @@ import re
 from collections import Counter
 from itertools import combinations
 from pathlib import Path
+from typing import TypedDict
 
 SALES_DIR = Path(__file__).parent
 REGIONS = {
@@ -15,7 +16,13 @@ REGIONS = {
     "humane-labs": "Humane Labs",
 }
 
-BUNDLES = {
+
+class BundleInfo(TypedDict):
+    fish: list[str]
+    bonus: int
+
+
+BUNDLES: dict[str, BundleInfo] = {
     "Bronze Multizone #1": {"fish": ["Dutch Fish", "Ocean Perch", "Broadbill"], "bonus": 10750},
     "Bronze Multizone #2": {"fish": ["Brook Trout", "Pufferfish", "Green Eel"], "bonus": 11000},
     "Silver Multizone #1": {"fish": ["Swordfish", "Blue Warehou", "Stingray"], "bonus": 12500},
@@ -322,7 +329,7 @@ def build_comparison_table() -> str:
         # to completing it. The bottleneck is the rarest fish in the bundle.
         # Expected completions per N fish ≈ min(probability_i) * N for each bundle.
         # So bundle value per fish = sum(min_prob * bonus) for each available bundle.
-        bundle_value_per_fish = 0
+        bundle_value_per_fish = 0.0
         available_bundles = []
         for bundle_name, bundle_info in BUNDLES.items():
             fish_probabilities = []
