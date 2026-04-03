@@ -177,34 +177,71 @@ def parse_log(path: Path) -> Counter:
     return totals
 
 
+def _stars_string(name: str) -> str:
+    """Return the star display string for a fish name."""
+    if name not in PRICES:
+        return "?"
+    _price, star_count, color = PRICES[name]
+    if star_count == 0:
+        return "-"
+    result = "\u2605" * star_count
+    if color:
+        result += f" {color}"
+    return result
+
+
+def _stars_sort_key(name: str) -> tuple[int, str]:
+    """Return (star_count, color) for sorting. Higher stars first, green last."""
+    if name not in PRICES:
+        return (0, "")
+    _price, star_count, color = PRICES[name]
+    return (star_count, color)
+
+
 def build_table(counts: Counter) -> str:
-    """Build a padded markdown table sorted alphabetically with bundles column."""
-    rows = sorted(counts.items(), key=lambda x: x[0])
+    """Build a padded markdown table sorted by stars (desc) then % (desc)."""
     total = sum(counts.values())
 
-    # Prepare data rows: (name, count_str, pct_str, bundles_str)
-    data = []
-    for name, count in rows:
-        pct = count / total * 100
+    # Prepare data rows: (name, count, pct, bundles_str, stars_str)
+    raw_rows = []
+    for name, count in counts.items():
+        percentage = count / total * 100
         bundles = ", ".join(FISH_BUNDLES.get(name, []))
-        data.append((name, str(count), f"{pct:.1f}%", bundles))
-    total_row = ("**Total**", f"**{total}**", "**100%**", "")
+        stars = _stars_string(name)
+        star_count, color = _stars_sort_key(name)
+        raw_rows.append((name, count, percentage, bundles, stars, star_count, color))
+
+    # Sort: stars desc, green after regular, then % desc
+    raw_rows.sort(key=lambda row: (-row[5], row[6], -row[2]))
+
+    data = [
+        (name, str(count), f"{percentage:.1f}%", stars, bundles)
+        for name, count, percentage, bundles, stars, _star_count, _color in raw_rows
+    ]
+    total_row = ("**Total**", f"**{total}**", "**100%**", "", "")
 
     # Column widths
-    w_name = max(len("Fish"), max(len(r[0]) for r in data), len(total_row[0]))
-    w_count = max(len("Count"), max(len(r[1]) for r in data), len(total_row[1]))
-    w_pct = max(len("%"), max(len(r[2]) for r in data), len(total_row[2]))
-    w_bun = max(len("Bundles"), max((len(r[3]) for r in data), default=0), len(total_row[3]))
+    w_name = max(len("Fish"), max(len(row[0]) for row in data), len(total_row[0]))
+    w_count = max(len("Count"), max(len(row[1]) for row in data), len(total_row[1]))
+    w_pct = max(len("%"), max(len(row[2]) for row in data), len(total_row[2]))
+    w_stars = max(len("Stars"), max(len(row[3]) for row in data), len(total_row[3]))
+    w_bun = max(len("Bundles"), max((len(row[4]) for row in data), default=0), len(total_row[4]))
 
-    def fmt(n: str, c: str, p: str, b: str) -> str:
-        return f"| {n:<{w_name}} | {c:>{w_count}} | {p:>{w_pct}} | {b:<{w_bun}} |"
+    def fmt(name: str, count: str, percentage: str, stars: str, bundles: str) -> str:
+        return (
+            f"| {name:<{w_name}} | {count:>{w_count}} | {percentage:>{w_pct}}"
+            f" | {stars:<{w_stars}} | {bundles:<{w_bun}} |"
+        )
 
     lines = [
-        fmt("Fish", "Count", "%", "Bundles"),
-        f"|{'-' * (w_name + 2)}|{'-' * (w_count + 1)}:|{'-' * (w_pct + 1)}:|{'-' * (w_bun + 2)}|",
+        fmt("Fish", "Count", "%", "Stars", "Bundles"),
+        (
+            f"|{'-' * (w_name + 2)}|{'-' * (w_count + 1)}:|{'-' * (w_pct + 1)}:"
+            f"|{'-' * (w_stars + 2)}|{'-' * (w_bun + 2)}|"
+        ),
     ]
-    for name, count_s, pct_s, bun_s in data:
-        lines.append(fmt(name, count_s, pct_s, bun_s))
+    for row in data:
+        lines.append(fmt(*row))
     lines.append(fmt(*total_row))
     return "\n".join(lines)
 
