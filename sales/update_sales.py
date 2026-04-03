@@ -1,5 +1,6 @@
 """Parse sales log files and update main .md files with frequency tables."""
 
+import math
 import re
 from collections import Counter
 from itertools import combinations
@@ -522,6 +523,287 @@ def build_bundle_details(region_counts: dict[str, Counter]) -> str:
     return "## Bundle Details\n\n" + "\n\n".join(sections)
 
 
+def _regularized_lower_gamma(shape: float, x: float) -> float:
+    """P(a, x) — regularized lower incomplete gamma via series expansion."""
+    if x <= 0:
+        return 0.0
+    term = 1.0 / shape
+    total = term
+    for n in range(1, 300):
+        term *= x / (shape + n)
+        total += term
+        if abs(term) < 1e-12 * abs(total):
+            break
+    return math.exp(-x + shape * math.log(x) - math.lgamma(shape)) * total
+
+
+def _chi_squared_p_value(statistic: float, degrees_of_freedom: int) -> float:
+    """Upper-tail p-value for a chi-squared statistic."""
+    if degrees_of_freedom <= 0 or statistic <= 0:
+        return 1.0
+    return 1.0 - _regularized_lower_gamma(
+        degrees_of_freedom / 2.0, statistic / 2.0
+    )
+
+
+def fit_integer_weights(
+    observed_counts: list[int],
+    max_weight: int = 10,
+) -> tuple[list[int], float, float]:
+    """Find simplest integer weights matching observed distribution.
+
+    Groups fish with identical counts so they always get the same weight.
+    Weights are monotonically non-increasing with count (higher count -> higher
+    or equal weight).  Picks the smallest total weight that passes p > 0.05.
+    Returns (weights, chi_squared, p_value).
+    """
+    fish_count = len(observed_counts)
+    total = sum(observed_counts)
+    degrees_of_freedom = fish_count - 1
+
+    # Group by count value (descending).  Fish with the same count share a
+    # group and will always receive the same weight.
+    indexed = sorted(enumerate(observed_counts), key=lambda pair: -pair[1])
+    groups: list[tuple[int, list[int]]] = []
+    for original_index, count in indexed:
+        if groups and count == groups[-1][0]:
+            groups[-1][1].append(original_index)
+        else:
+            groups.append((count, [original_index]))
+
+    group_count = len(groups)
+    group_sizes = [len(indices) for _, indices in groups]
+
+    # Enumerate all non-increasing weight vectors (one weight per group).
+    candidates: list[tuple[int, list[int], float, float]] = []
+
+    def search(
+        group_index: int,
+        max_allowed: int,
+        current_group_weights: list[int],
+    ) -> None:
+        if group_index == group_count:
+            weights = [0] * fish_count
+            total_weight = 0
+            for g_index, (_, indices) in enumerate(groups):
+                for fish_index in indices:
+                    weights[fish_index] = current_group_weights[g_index]
+                total_weight += current_group_weights[g_index] * group_sizes[g_index]
+
+            expected = [total * weight / total_weight for weight in weights]
+            chi_squared = sum(
+                (observed_counts[i] - expected[i]) ** 2 / expected[i]
+                for i in range(fish_count)
+            )
+            p_value = _chi_squared_p_value(chi_squared, degrees_of_freedom)
+            candidates.append((total_weight, weights, chi_squared, p_value))
+            return
+
+        for weight in range(1, max_allowed + 1):
+            search(group_index + 1, weight, current_group_weights + [weight])
+
+    search(0, max_weight, [])
+
+    passing = [candidate for candidate in candidates if candidate[3] > 0.05]
+    if passing:
+        # AIC-like scoring: balance fit quality vs complexity.
+        # Lower is better: chi_squared + 2 * (distinct_weights - 1)
+        passing.sort(key=lambda candidate: (
+            candidate[2] + 2 * (len(set(candidate[1])) - 1),
+            candidate[0],
+        ))
+        _, weights, chi_squared, p_value = passing[0]
+    else:
+        candidates.sort(key=lambda candidate: candidate[2])
+        _, weights, chi_squared, p_value = candidates[0]
+
+    common = math.gcd(*weights)
+    return (
+        [weight // common for weight in weights],
+        chi_squared,
+        p_value,
+    )
+
+
+def build_drop_rate_analysis(region_counts: dict[str, Counter]) -> str:
+    """Build drop rate analysis: tier distribution and within-tier weight fitting."""
+    if not region_counts:
+        return ""
+
+    sections: list[str] = ["## Drop Rate Analysis"]
+
+    # --- Tier Distribution ---
+    tier_data: dict[str, dict[int, tuple[int, int]]] = {}
+    for region_name, counts in region_counts.items():
+        total = sum(counts.values())
+        tier_totals: dict[int, int] = {1: 0, 2: 0, 3: 0}
+        for fish_name, fish_count in counts.items():
+            if fish_name in PRICES:
+                _price, star_count, _color = PRICES[fish_name]
+                if star_count in tier_totals:
+                    tier_totals[star_count] += fish_count
+        tier_data[region_name] = {
+            stars: (tier_total, total)
+            for stars, tier_total in tier_totals.items()
+        }
+
+    region_names = list(region_counts.keys())
+
+    tier_rows: list[tuple[str, ...]] = []
+    for stars in [3, 2, 1]:
+        star_label = "\u2605" * stars
+        values: list[str] = [star_label]
+        percentages: list[float] = []
+        for region_name in region_names:
+            tier_count, total = tier_data[region_name][stars]
+            percentage = tier_count / total * 100
+            percentages.append(percentage)
+            values.append(f"{percentage:.1f}%")
+        if len(region_names) > 1:
+            average = sum(percentages) / len(percentages)
+            values.append(f"{average:.1f}%")
+        tier_rows.append(tuple(values))
+
+    tier_headers: tuple[str, ...] = ("Tier",) + tuple(region_names)
+    if len(region_names) > 1:
+        tier_headers += ("Average",)
+    tier_right_columns = set(range(1, len(tier_headers)))
+    tier_widths = [
+        max(len(tier_headers[column]), max(len(row[column]) for row in tier_rows))
+        for column in range(len(tier_headers))
+    ]
+
+    def format_tier_row(*values: str) -> str:
+        return "| " + " | ".join(
+            f"{value:>{tier_widths[column]}}" if column in tier_right_columns
+            else f"{value:<{tier_widths[column]}}"
+            for column, value in enumerate(values)
+        ) + " |"
+
+    tier_separator = "|"
+    for column in range(len(tier_headers)):
+        if column in tier_right_columns:
+            tier_separator += f"{"-" * (tier_widths[column] + 1)}:|"
+        else:
+            tier_separator += f"{"-" * (tier_widths[column] + 2)}|"
+
+    sections.extend([
+        "",
+        "### Tier Distribution",
+        "",
+        "Tier drop rates are consistent across locations,"
+        " suggesting a fixed game mechanic:",
+        "",
+        format_tier_row(*tier_headers),
+        tier_separator,
+    ])
+    for row in tier_rows:
+        sections.append(format_tier_row(*row))
+
+    # --- Within-Tier Weights ---
+    sections.extend([
+        "",
+        "### Within-Tier Weights",
+        "",
+        "Fitted smallest integer weights per fish"
+        " using \u03c7\u00b2 goodness-of-fit (p > 0.05 = acceptable).",
+    ])
+
+    for region_name, counts in region_counts.items():
+        tiers: dict[int, list[tuple[str, int]]] = {1: [], 2: [], 3: []}
+        for fish_name, fish_count in counts.items():
+            if fish_name in PRICES:
+                _price, star_count, _color = PRICES[fish_name]
+                if star_count in tiers:
+                    tiers[star_count].append((fish_name, fish_count))
+
+        for stars in [3, 2, 1]:
+            fish_in_tier = tiers[stars]
+            if len(fish_in_tier) < 2:
+                continue
+
+            fish_in_tier.sort(key=lambda pair: -pair[1])
+            observed = [count for _name, count in fish_in_tier]
+            tier_total = sum(observed)
+
+            weights, chi_squared, p_value = fit_integer_weights(observed)
+            weight_sum = sum(weights)
+
+            star_label = "\u2605" * stars
+            sections.extend([
+                "",
+                f"#### {region_name} \u2014 {star_label}"
+                f" ({len(fish_in_tier)} fish, {tier_total} observed)",
+                "",
+            ])
+
+            table_rows: list[tuple[str, ...]] = []
+            for i, (name, count) in enumerate(fish_in_tier):
+                observed_percentage = count / tier_total * 100
+                expected_percentage = weights[i] / weight_sum * 100
+                expected_count = tier_total * weights[i] / weight_sum
+                residual = count - expected_count
+                table_rows.append((
+                    name,
+                    str(count),
+                    f"{observed_percentage:.1f}%",
+                    str(weights[i]),
+                    f"{expected_percentage:.1f}%",
+                    f"{residual:+.1f}",
+                ))
+
+            weight_headers = (
+                "Fish", "Count", "Observed %",
+                "Weight", "Expected %", "Residual",
+            )
+            weight_right_columns = {1, 2, 3, 4, 5}
+            weight_widths = [
+                max(
+                    len(weight_headers[column]),
+                    max(len(row[column]) for row in table_rows),
+                )
+                for column in range(len(weight_headers))
+            ]
+
+            def format_weight_row(
+                *values: str,
+                widths: list[int] = weight_widths,
+                right_columns: set[int] = weight_right_columns,
+            ) -> str:
+                return "| " + " | ".join(
+                    f"{value:>{widths[column]}}" if column in right_columns
+                    else f"{value:<{widths[column]}}"
+                    for column, value in enumerate(values)
+                ) + " |"
+
+            sections.append(format_weight_row(*weight_headers))
+            weight_separator = "|"
+            for column in range(len(weight_headers)):
+                if column in weight_right_columns:
+                    weight_separator += f"{"-" * (weight_widths[column] + 1)}:|"
+                else:
+                    weight_separator += f"{"-" * (weight_widths[column] + 2)}|"
+            sections.append(weight_separator)
+            for row in table_rows:
+                sections.append(format_weight_row(*row))
+
+            quality = (
+                "excellent" if p_value > 0.5
+                else "good" if p_value > 0.1
+                else "acceptable" if p_value > 0.05
+                else "poor"
+            )
+            sections.extend([
+                "",
+                f"\u03c7\u00b2 = {chi_squared:.2f},"
+                f" df = {len(fish_in_tier) - 1},"
+                f" p = {p_value:.3f}"
+                f" \u2014 {quality} fit",
+            ])
+
+    return "\n".join(sections)
+
+
 def main() -> None:
     for key, name in REGIONS.items():
         update_md(key, name)
@@ -559,6 +841,7 @@ def main() -> None:
                     region_counts[region_name] = counts
 
         bundle_details = build_bundle_details(region_counts)
+        drop_rate_analysis = build_drop_rate_analysis(region_counts)
         time_note = (
             f"Assuming {SECONDS_WAITING_FOR_BITE}s wait for bite"
             f" + {SECONDS_REELING_IN}s reel-in"
@@ -568,6 +851,8 @@ def main() -> None:
         content = f"# Location Comparison\n\n{time_note}\n\n{comparison_table}\n"
         if bundle_details:
             content += f"\n{bundle_details}\n"
+        if drop_rate_analysis:
+            content += f"\n{drop_rate_analysis}\n"
 
         comparison_md = SALES_DIR / "comparison.md"
         comparison_md.write_text(content)
