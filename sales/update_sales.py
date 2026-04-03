@@ -2,6 +2,7 @@
 
 import re
 from collections import Counter
+from itertools import combinations
 from pathlib import Path
 
 SALES_DIR = Path(__file__).parent
@@ -282,6 +283,185 @@ def update_md(region_key: str, region_name: str) -> None:
     print(f"  {region_key}.md updated ({len(counts)} fish, {batches} batches)")
 
 
+def build_comparison_table() -> str:
+    """Build a revenue comparison table using total fish frequencies.
+
+    For each location with data, computes:
+    - Expected $/fish from sales (weighted average price by catch frequency)
+    - Which bundles are available and their probability-weighted bonus per fish
+    - Total expected $/fish
+    """
+    rows = []
+    for region_key, region_name in REGIONS.items():
+        log_path = SALES_DIR / f"{region_key}-log.md"
+        if not log_path.exists():
+            continue
+
+        counts = parse_log(log_path)
+        if not counts:
+            continue
+
+        total_fish = sum(counts.values())
+
+        # Weighted average sale price per fish
+        total_sale_value = sum(
+            counts[name] * PRICES[name][0]
+            for name in counts
+            if name in PRICES
+        )
+        sale_value_per_fish = total_sale_value / total_fish
+
+        # Bundle value per fish:
+        # For each bundle, compute the probability that a random fish contributes
+        # to completing it. The bottleneck is the rarest fish in the bundle.
+        # Expected completions per N fish ≈ min(probability_i) * N for each bundle.
+        # So bundle value per fish = sum(min_prob * bonus) for each available bundle.
+        bundle_value_per_fish = 0
+        available_bundles = []
+        for bundle_name, bundle_info in BUNDLES.items():
+            fish_probabilities = []
+            for fish in bundle_info["fish"]:
+                if fish not in counts:
+                    break
+                fish_probabilities.append(counts[fish] / total_fish)
+            else:
+                # All fish in this bundle were caught at this location
+                bottleneck_probability = min(fish_probabilities)
+                bundle_contribution = bottleneck_probability * bundle_info["bonus"]
+                bundle_value_per_fish += bundle_contribution
+                available_bundles.append(bundle_name)
+
+        total_value_per_fish = sale_value_per_fish + bundle_value_per_fish
+
+        bundles_string = ", ".join(available_bundles) if available_bundles else "none"
+
+        rows.append((
+            region_name,
+            str(total_fish),
+            f"${sale_value_per_fish:,.0f}",
+            bundles_string,
+            f"${bundle_value_per_fish:,.0f}",
+            f"**${total_value_per_fish:,.0f}**",
+        ))
+
+    if not rows:
+        return ""
+
+    headers = (
+        "Location", "Fish Caught", "$/Fish (sales)",
+        "Available Bundles", "$/Fish (bundles)", "$/Fish (total)",
+    )
+    widths = [
+        max(len(headers[column]), max(len(row[column]) for row in rows))
+        for column in range(len(headers))
+    ]
+
+    def format_row(*values: str) -> str:
+        return "| " + " | ".join(
+            f"{value:>{widths[column]}}" if column in (1, 2, 4, 5) else f"{value:<{widths[column]}}"
+            for column, value in enumerate(values)
+        ) + " |"
+
+    lines = [format_row(*headers)]
+    separator_parts = []
+    for column in range(len(headers)):
+        if column in (1, 2, 4, 5):
+            separator_parts.append(f"{'-' * (widths[column] + 1)}:")
+        else:
+            separator_parts.append(f"{'-' * (widths[column] + 2)}")
+    lines.append("|" + "|".join(separator_parts) + "|")
+    for row in rows:
+        lines.append(format_row(*row))
+    return "\n".join(lines)
+
+
+def expected_fish_to_complete_bundle(
+    fish_probabilities: list[float],
+) -> float:
+    """Compute expected number of fish to catch before completing a bundle.
+
+    Uses inclusion-exclusion on the coupon collector problem with unequal
+    probabilities. For bundle fish with catch probabilities p_1 ... p_k:
+
+    E[T] = sum over non-empty subsets S: (-1)^(|S|+1) / sum(p_i for i in S)
+    """
+    item_count = len(fish_probabilities)
+    expected_value = 0.0
+    for subset_size in range(1, item_count + 1):
+        sign = (-1) ** (subset_size + 1)
+        for subset in combinations(range(item_count), subset_size):
+            probability_sum = sum(fish_probabilities[i] for i in subset)
+            expected_value += sign / probability_sum
+    return expected_value
+
+
+def build_bundle_details(region_counts: dict[str, Counter]) -> str:
+    """Build a bundle details section showing expected fish per bundle completion."""
+    sections = []
+
+    for region_name, counts in region_counts.items():
+        total_fish = sum(counts.values())
+        bundle_rows = []
+
+        for bundle_name, bundle_info in BUNDLES.items():
+            fish_probabilities = []
+            fish_details = []
+            for fish in bundle_info["fish"]:
+                if fish not in counts:
+                    break
+                probability = counts[fish] / total_fish
+                fish_probabilities.append(probability)
+                fish_details.append(
+                    f"{fish}: {counts[fish]}/{total_fish} ({probability:.1%})"
+                )
+            else:
+                expected_fish = expected_fish_to_complete_bundle(fish_probabilities)
+                bonus_per_fish = bundle_info["bonus"] / expected_fish
+                bundle_rows.append((
+                    bundle_name,
+                    ", ".join(bundle_info["fish"]),
+                    f"${bundle_info['bonus']:,}",
+                    f"{expected_fish:.0f}",
+                    f"${bonus_per_fish:,.0f}",
+                    " \\| ".join(fish_details),
+                ))
+
+        if not bundle_rows:
+            continue
+
+        headers = (
+            "Bundle", "Fish", "Bonus",
+            "Avg Fish to Complete", "Bonus/Fish", "Catch Rates",
+        )
+        widths = [
+            max(len(headers[column]), max(len(row[column]) for row in bundle_rows))
+            for column in range(len(headers))
+        ]
+
+        def format_bundle_row(*values: str) -> str:
+            return "| " + " | ".join(
+                f"{value:>{widths[column]}}" if column in (2, 3, 4)
+                else f"{value:<{widths[column]}}"
+                for column, value in enumerate(values)
+            ) + " |"
+
+        lines = [f"### {region_name}", "", format_bundle_row(*headers)]
+        separator_parts = []
+        for column in range(len(headers)):
+            if column in (2, 3, 4):
+                separator_parts.append(f"{'-' * (widths[column] + 1)}:")
+            else:
+                separator_parts.append(f"{'-' * (widths[column] + 2)}")
+        lines.append("|" + "|".join(separator_parts) + "|")
+        for row in bundle_rows:
+            lines.append(format_bundle_row(*row))
+        sections.append("\n".join(lines))
+
+    if not sections:
+        return ""
+    return "## Bundle Details\n\n" + "\n\n".join(sections)
+
+
 def main() -> None:
     for key, name in REGIONS.items():
         update_md(key, name)
@@ -294,9 +474,38 @@ def main() -> None:
 
     # Write prices.md
     prices_md = SALES_DIR / "prices.md"
+    prices_header = """# Fish Prices
+
+## Pricing Tiers
+
+| Location     | ★      | ★★     | ★★★    |
+|--------------|-------:|-------:|-------:|"""
+    for location, tiers in TIER_PRICES.items():
+        prices_header += f"\n| {location:<12} | ${tiers[1]:,} | ${tiers[2]:,} | ${tiers[3]:,} |"
+    prices_header += "\n\nGreen stars (★ green) = Humane Labs tier. Special fish have fixed prices.\n\n## All Fish\n\n"
     table = build_prices_table()
-    prices_md.write_text(f"# Fish Prices\n\n{table}\n", encoding="utf-8")
+    prices_md.write_text(prices_header + table + "\n", encoding="utf-8")
     print(f"  prices.md updated ({len(PRICES)} fish)")
+
+    # Write comparison.md
+    comparison_table = build_comparison_table()
+    if comparison_table:
+        region_counts: dict[str, Counter] = {}
+        for region_key, region_name in REGIONS.items():
+            log_path = SALES_DIR / f"{region_key}-log.md"
+            if log_path.exists():
+                counts = parse_log(log_path)
+                if counts:
+                    region_counts[region_name] = counts
+
+        bundle_details = build_bundle_details(region_counts)
+        content = f"# Location Comparison\n\n{comparison_table}\n"
+        if bundle_details:
+            content += f"\n{bundle_details}\n"
+
+        comparison_md = SALES_DIR / "comparison.md"
+        comparison_md.write_text(content)
+        print("  comparison.md updated")
 
 
 if __name__ == "__main__":
