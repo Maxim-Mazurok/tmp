@@ -33,8 +33,6 @@ Blue Warehou	4
 Broadbill	8
 Trout	4
 --sold
-Holster	1
-Backpack	1
 Broadbill	9
 Blue Warehou	5
 Scollop	6
