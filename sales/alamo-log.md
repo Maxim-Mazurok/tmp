@@ -43,3 +43,14 @@ Golden Perch	1
 Southern Tuna	1
 Southern Garfish	2
 --sold
+Albacore	5
+Flathead	3
+Halibut	2
+Redfish	4
+Morwhong	2
+Broadbill	1
+Scollop	3
+Blue Warehou	1
+Southern Garfish	4
+Southern Tuna	1
+Snow Crab	1
