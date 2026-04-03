@@ -31,6 +31,7 @@ class FishingController:
     GRAVITY = PHYSICS_PROFILE.gravity
     THRUST = PHYSICS_PROFILE.thrust
     HOVER = PHYSICS_PROFILE.hover
+    HOVER_BIAS = 0.05  # upward bias to compensate systematic box-below-fish drift
     LOOKAHEAD = 0.095  # seconds to predict fish position ahead (~input lag)
     PROJECTION_HORIZON_FRAMES = 12
     TRACKING_PROGRESS_THRESHOLD = 0.003
@@ -38,6 +39,7 @@ class FishingController:
     TRACKING_KD_SCALE = 1.20
     TRACKING_DEADZONE_FRAC = 0.30
     MISSING_FISH_KP_SCALE = 0.70
+    INSIDE_BOX_SPEED_SCALE = 0.85  # fish slows ~15% when inside white box
 
     def __init__(self):
         self.space_held = False
@@ -109,6 +111,13 @@ class FishingController:
         # Predict where the fish WILL BE, not where it is now.
         # Accounts for input lag (~100ms) + box acceleration time.
         prediction_velocity = self._prediction_velocity(detector)
+
+        # Fish slows down when inside the white box (progress rising)
+        progress_delta = float(getattr(detector, 'progress_delta', 0.0) or 0.0)
+        inside_box = detector.box_top <= detector.fish_y <= detector.box_bottom
+        if progress_delta > self.TRACKING_PROGRESS_THRESHOLD and inside_box:
+            prediction_velocity *= self.INSIDE_BOX_SPEED_SCALE
+
         fish_pred = fish + prediction_velocity * self.LOOKAHEAD
         fish_pred = max(0.0, min(1.0, fish_pred))
         self.last_fish_pred = fish_pred
@@ -136,7 +145,8 @@ class FishingController:
         d_term = error_rate * self.Kd * kd_scale
 
         # Duty: HOVER = neutral, >HOVER = hold more (go up), <HOVER = release
-        self._duty = self.HOVER - self.Kp * kp_scale * error - d_term
+        effective_hover = self.HOVER + self.HOVER_BIAS
+        self._duty = effective_hover - self.Kp * kp_scale * error - d_term
         self._duty = max(0.0, min(1.0, self._duty))
 
         # Accumulator-based PWM: evenly spreads hold frames

@@ -581,6 +581,16 @@ def _handle_waiting(state_ctx):
     state_ctx['search_offset_y'] = region['top']
 
     if detector.find_bar(img):
+        # Require consecutive detections to confirm bar (prevents false positives at startup)
+        confirm_count = state_ctx.get('_bar_confirm_count', 0) + 1
+        state_ctx['_bar_confirm_count'] = confirm_count
+        if confirm_count < 3:
+            if confirm_count == 1:
+                print(f"[*] Bar candidate found, confirming... ({confirm_count}/3)")
+            detector.bar_found = False
+            time.sleep(0.05)
+            return
+
         # Validate the detected bar has sufficient bright blue
         val_strip = img[detector.col_y1:detector.col_y2 + 1,
                         detector.col_x1:detector.col_x2 + 1]
@@ -624,6 +634,8 @@ def _handle_waiting(state_ctx):
         if controller.space_held:
             pydirectinput.keyUp('space')
     else:
+        # Reset confirmation counter on failed detection
+        state_ctx['_bar_confirm_count'] = 0
         if debug:
             vis = img.copy()
             diag = getattr(detector, '_last_find_bar_diag', '')
@@ -773,7 +785,7 @@ def _handle_minigame(state_ctx):
         col_hsv = cv2.cvtColor(col_strip, cv2.COLOR_BGR2HSV)
         bright_blue_mask = cv2.inRange(
             col_hsv,
-            np.array([BLUE_H_MIN, 40, 100]),
+            np.array([BLUE_H_MIN, 25, 50]),
             np.array([BLUE_H_MAX, 255, 255])
         )
         blue_ratio = np.sum(bright_blue_mask > 0) / max(bright_blue_mask.size, 1)
