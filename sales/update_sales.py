@@ -21,6 +21,16 @@ BUNDLES = {
     "Low Level Multizone": {"fish": ["Scallop", "Carp", "Grenadier"], "bonus": 11000},
 }
 
+# Fish prices: name -> (price, stars)
+PRICES: dict[str, tuple[int, int]] = {
+    "Black Bream": (1500, 1),
+    "Carp": (1850, 2),
+    "Morwhong": (1350, 1),
+    "Musky": (2150, 3),
+    "Silver Trevally": (2000, 3),
+    "Southern Tuna": (1650, 2),
+}
+
 # Reverse lookup: fish name -> list of bundle names
 FISH_BUNDLES: dict[str, list[str]] = {}
 for bname, binfo in BUNDLES.items():
@@ -98,6 +108,29 @@ def build_bundles_table() -> str:
     return "\n".join(lines)
 
 
+def build_prices_table() -> str:
+    """Build a padded markdown table of fish prices."""
+    data = []
+    for name in sorted(PRICES):
+        price, stars = PRICES[name]
+        data.append((name, f"${price:,}", "\u2605" * stars))
+
+    w_name = max(len("Fish"), max(len(r[0]) for r in data))
+    w_price = max(len("Price"), max(len(r[1]) for r in data))
+    w_stars = max(len("Stars"), max(len(r[2]) for r in data))
+
+    def fmt(n: str, p: str, s: str) -> str:
+        return f"| {n:<{w_name}} | {p:>{w_price}} | {s:<{w_stars}} |"
+
+    lines = [
+        fmt("Fish", "Price", "Stars"),
+        f"|{'-' * (w_name + 2)}|{'-' * (w_price + 1)}:|{'-' * (w_stars + 2)}|",
+    ]
+    for row in data:
+        lines.append(fmt(*row))
+    return "\n".join(lines)
+
+
 def update_md(region_key: str, region_name: str) -> None:
     log_path = SALES_DIR / f"{region_key}-log.md"
     md_path = SALES_DIR / f"{region_key}.md"
@@ -127,6 +160,12 @@ def main() -> None:
     table = build_bundles_table()
     bundles_md.write_text(f"# Bundles\n\n{table}\n")
     print(f"  bundles.md updated ({len(BUNDLES)} bundles)")
+
+    # Write prices.md
+    prices_md = SALES_DIR / "prices.md"
+    table = build_prices_table()
+    prices_md.write_text(f"# Fish Prices\n\n{table}\n", encoding="utf-8")
+    print(f"  prices.md updated ({len(PRICES)} fish)")
 
 
 if __name__ == "__main__":
