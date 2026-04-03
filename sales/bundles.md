@@ -9,4 +9,4 @@
 | Gold Multizone #1   | Bluefin Tuna, Musky, Dolphinfish         | $12,750 |
 | Gold Multizone #2   | Blue Marlin, Blobfish, Whale Shark       | $15,000 |
 | Alamo Starter       | Morwhong, Southern Tuna, Silver Trevally | $10,000 |
-| Low Level Multizone | Scallop, Carp, Grenadier                 | $11,000 |
+| Low Level Multizone | Scollop, Carp, Grenadier                 | $11,000 |
