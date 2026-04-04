@@ -12,6 +12,21 @@ Assuming 100s wait for bite + 15s reel-in = 115s per fish (31.3 fish/hour).
 | Land Act Dam |         203 |         $1,670 | Gold Multizone #1~, Low Level Multizone                |             $393 |     **$2,063** | $64,583 |
 | Roxwood      |          35 |         $1,794 | Gold Multizone #1~, Low Level Multizone                |             $371 |     **$2,166** | $67,796 |
 
+## Optimal Allocation
+
+Note: some bundle fish probabilities are estimated (~).
+
+Optimal time split across locations to maximize total $/hour (considering both sale value and cross-location bundle completions):
+
+| Location     | Time % | $/Fish (sales) | $/Hour (solo) |
+|--------------|-------:|---------------:|--------------:|
+| Alamo Sea    |    18% |         $1,472 |       $52,800 |
+| Land Act Dam |    46% |         $1,670 |       $52,284 |
+| Roxwood      |    36% |         $1,794 |       $56,169 |
+| **Combined** |   100% |                |   **$61,225** |
+
+Splitting across locations yields **$61,225**/hour vs **$56,169**/hour best solo (+$5,056/hour, +9.0%).
+
 ## Bundle Details
 
 ### Alamo Sea

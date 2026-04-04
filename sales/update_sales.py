@@ -699,6 +699,262 @@ def expected_fish_to_complete_bundle(
     return expected_value
 
 
+class BundleFishAssignment(TypedDict):
+    fish: str
+    location: str
+    probability: float
+    estimated: bool
+
+
+def _resolve_available_bundles(
+    region_data: dict[str, Counter],
+) -> list[tuple[str, int, list[BundleFishAssignment]]]:
+    """Resolve all available bundles with fish-to-location assignments.
+
+    Returns: [(bundle_name, bonus, [BundleFishAssignment, ...]), ...]
+    """
+    unlocked = _detect_unlocked_locations()
+    result = []
+
+    for bundle_name, bundle_info in BUNDLES.items():
+        min_tier = _bundle_min_tier(bundle_name)
+        if min_tier is None or min_tier > len(unlocked):
+            continue
+
+        assignments: list[BundleFishAssignment] = []
+        all_resolved = True
+
+        for fish in bundle_info["fish"]:
+            home_location = fish_location(fish)
+            best_location = None
+            best_probability = 0.0
+            is_estimated = False
+
+            for region_name, counts in region_data.items():
+                if fish in counts:
+                    total_fish = sum(counts.values())
+                    probability = counts[fish] / total_fish
+                    if probability > best_probability:
+                        best_probability = probability
+                        best_location = region_name
+
+            if best_location is None:
+                home_counts = region_data.get(home_location)
+                if home_counts:
+                    estimated = _estimate_fish_probability(
+                        fish, home_location, home_counts,
+                    )
+                    if estimated:
+                        best_probability = estimated
+                        best_location = home_location
+                        is_estimated = True
+
+            if best_location is None:
+                all_resolved = False
+                break
+
+            assignments.append({
+                "fish": fish,
+                "location": best_location,
+                "probability": best_probability,
+                "estimated": is_estimated,
+            })
+
+        if all_resolved:
+            result.append((bundle_name, bundle_info["bonus"], assignments))
+
+    return result
+
+
+def _compute_revenue(
+    fractions: dict[str, float],
+    sale_values: dict[str, float],
+    bundles: list[tuple[str, int, list[BundleFishAssignment]]],
+) -> float:
+    """Compute total $/hour for a given time allocation.
+
+    revenue = r * Σ(f_i * sale_i) + Σ_bundles(min_j(f_loc(j) * r * p_j) * bonus)
+
+    For single-location bundles, the min collapses to f_loc * r * min(p_j).
+    """
+    sale_revenue = FISH_PER_HOUR * sum(
+        fractions.get(location, 0) * sale_value
+        for location, sale_value in sale_values.items()
+    )
+
+    bundle_revenue = 0.0
+    for _, bonus, assignments in bundles:
+        locations = {assignment["location"] for assignment in assignments}
+        if len(locations) == 1:
+            location = next(iter(locations))
+            fraction = fractions.get(location, 0)
+            bottleneck = min(a["probability"] for a in assignments)
+            bundle_revenue += fraction * FISH_PER_HOUR * bottleneck * bonus
+        else:
+            rates = [
+                fractions.get(a["location"], 0) * FISH_PER_HOUR * a["probability"]
+                for a in assignments
+            ]
+            bundle_revenue += min(rates) * bonus
+
+    return sale_revenue + bundle_revenue
+
+
+def build_optimal_allocation(region_data: dict[str, Counter]) -> str:
+    """Find the optimal time allocation across locations to maximize $/hour.
+
+    Solves: max r·Σ(fᵢ·saleᵢ) + Σ_bundles(min_j(f_loc(j)·r·pⱼ)·bonus)
+    subject to Σfᵢ = 1, fᵢ ≥ 0.
+
+    Uses grid search over allocation fractions (1% granularity).
+    """
+    if len(region_data) < 2:
+        return ""
+
+    locations = [
+        name for name in LOCATION_ORDER if name in region_data
+    ]
+    if len(locations) < 2:
+        return ""
+
+    # Sale value per fish at each location
+    sale_values: dict[str, float] = {}
+    for location, counts in region_data.items():
+        total_fish = sum(counts.values())
+        total_value = sum(
+            counts[name] * PRICES[name][0]
+            for name in counts
+            if name in PRICES
+        )
+        sale_values[location] = total_value / total_fish
+
+    bundles = _resolve_available_bundles(region_data)
+
+    # Check if any cross-location bundles exist
+    has_cross_location = any(
+        len({a["location"] for a in assignments}) > 1
+        for _, _, assignments in bundles
+    )
+    if not has_cross_location:
+        return ""
+
+    any_estimated = any(
+        any(a["estimated"] for a in assignments)
+        for _, _, assignments in bundles
+    )
+
+    # Grid search with 1% granularity
+    granularity = 100
+    best_revenue = -1.0
+    best_fractions: dict[str, float] = {}
+
+    if len(locations) == 2:
+        for step_a in range(granularity + 1):
+            fraction_a = step_a / granularity
+            fraction_b = 1.0 - fraction_a
+            fractions = {locations[0]: fraction_a, locations[1]: fraction_b}
+            revenue = _compute_revenue(fractions, sale_values, bundles)
+            if revenue > best_revenue:
+                best_revenue = revenue
+                best_fractions = fractions.copy()
+    elif len(locations) == 3:
+        for step_a in range(granularity + 1):
+            fraction_a = step_a / granularity
+            remaining = granularity - step_a
+            for step_b in range(remaining + 1):
+                fraction_b = step_b / granularity
+                fraction_c = 1.0 - fraction_a - fraction_b
+                fractions = {
+                    locations[0]: fraction_a,
+                    locations[1]: fraction_b,
+                    locations[2]: fraction_c,
+                }
+                revenue = _compute_revenue(fractions, sale_values, bundles)
+                if revenue > best_revenue:
+                    best_revenue = revenue
+                    best_fractions = fractions.copy()
+    else:
+        return ""
+
+    # Also compute single-location baselines
+    baseline_revenues: dict[str, float] = {}
+    for location in locations:
+        solo = {loc: (1.0 if loc == location else 0.0) for loc in locations}
+        baseline_revenues[location] = _compute_revenue(solo, sale_values, bundles)
+
+    # Build output
+    lines = ["## Optimal Allocation"]
+    if any_estimated:
+        lines.append("")
+        lines.append("Note: some bundle fish probabilities are estimated (~).")
+    lines.append("")
+    lines.append(
+        "Optimal time split across locations to maximize total $/hour"
+        " (considering both sale value and cross-location bundle completions):"
+    )
+    lines.append("")
+
+    # Allocation table
+    allocation_rows = []
+    for location in locations:
+        fraction = best_fractions.get(location, 0)
+        allocation_rows.append((
+            location,
+            f"{fraction:.0%}",
+            f"${sale_values[location]:,.0f}",
+            f"${baseline_revenues[location]:,.0f}",
+        ))
+    allocation_rows.append((
+        "**Combined**",
+        "100%",
+        "",
+        f"**${best_revenue:,.0f}**",
+    ))
+
+    headers = ("Location", "Time %", "$/Fish (sales)", "$/Hour (solo)")
+    right_columns = {1, 2, 3}
+    widths = [
+        max(
+            len(headers[column]),
+            max(len(row[column]) for row in allocation_rows),
+        )
+        for column in range(len(headers))
+    ]
+
+    def format_allocation_row(
+        *values: str, _widths: list[int] = widths,
+    ) -> str:
+        return "| " + " | ".join(
+            f"{value:>{_widths[column]}}" if column in right_columns
+            else f"{value:<{_widths[column]}}"
+            for column, value in enumerate(values)
+        ) + " |"
+
+    lines.append(format_allocation_row(*headers))
+    separator_parts = []
+    for column in range(len(headers)):
+        if column in right_columns:
+            separator_parts.append(f"{'-' * (widths[column] + 1)}:")
+        else:
+            separator_parts.append(f"{'-' * (widths[column] + 2)}")
+    lines.append("|" + "|".join(separator_parts) + "|")
+    for row in allocation_rows:
+        lines.append(format_allocation_row(*row))
+
+    best_solo = max(baseline_revenues.values())
+    uplift = best_revenue - best_solo
+    uplift_percentage = (uplift / best_solo) * 100 if best_solo > 0 else 0
+    lines.append("")
+    lines.append(
+        f"Splitting across locations yields"
+        f" **${best_revenue:,.0f}**/hour vs"
+        f" **${best_solo:,.0f}**/hour best solo"
+        f" (+${uplift:,.0f}/hour, +{uplift_percentage:.1f}%)."
+    )
+
+    return "\n".join(lines)
+
+
 def build_bundle_details(region_counts: dict[str, Counter]) -> str:
     """Build a bundle details section showing expected fish per bundle completion."""
     sections = []
@@ -1232,6 +1488,9 @@ def main() -> None:
             f"# Location Comparison\n\n{tier_note}\n\n{time_note}\n\n"
             f"{estimated_note}\n\n{comparison_table}\n"
         )
+        optimal_allocation = build_optimal_allocation(region_counts)
+        if optimal_allocation:
+            content += f"\n{optimal_allocation}\n"
         if bundle_details:
             content += f"\n{bundle_details}\n"
         if drop_rate_analysis:
