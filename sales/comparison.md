@@ -4,7 +4,7 @@ Assuming 100s wait for bite + 15s reel-in = 115s per fish (31.3 fish/hour).
 
 | Location     | Fish Caught | $/Fish (sales) | Available Bundles | $/Fish (bundles) | $/Fish (total) |  $/Hour |
 |--------------|------------:|---------------:|-------------------|-----------------:|---------------:|--------:|
-| Alamo Sea    |         321 |         $1,468 | Alamo Starter     |             $280 |     **$1,748** | $54,734 |
+| Alamo Sea    |         417 |         $1,483 | Alamo Starter     |             $216 |     **$1,699** | $53,180 |
 | Land Act Dam |         203 |         $1,670 | none              |               $0 |     **$1,670** | $52,284 |
 
 ## Bundle Details
@@ -13,7 +13,7 @@ Assuming 100s wait for bite + 15s reel-in = 115s per fish (31.3 fish/hour).
 
 | Bundle        | Fish                                     |   Bonus | Avg Fish to Complete | Avg Time | Bonus/Fish | Catch Rates                                                                              |
 |---------------|------------------------------------------|--------:|---------------------:|---------:|-----------:|------------------------------------------------------------------------------------------|
-| Alamo Starter | Morwhong, Southern Tuna, Silver Trevally | $10,000 |                   48 |   92 min |       $208 | Morwhong: 22/321 (6.9%) \| Southern Tuna: 9/321 (2.8%) \| Silver Trevally: 13/321 (4.0%) |
+| Alamo Starter | Morwhong, Southern Tuna, Silver Trevally | $10,000 |                   57 |  109 min |       $175 | Morwhong: 27/417 (6.5%) \| Southern Tuna: 9/417 (2.2%) \| Silver Trevally: 17/417 (4.1%) |
 
 ## Drop Rate Analysis
 
@@ -23,49 +23,50 @@ Tier drop rates are consistent across locations, suggesting a fixed game mechani
 
 | Tier | Alamo Sea | Land Act Dam | Average |
 |------|----------:|-------------:|--------:|
-| ★★★  |      6.2% |        11.3% |    8.8% |
-| ★★   |     25.9% |        27.6% |   26.7% |
-| ★    |     67.9% |        61.1% |   64.5% |
+| ★★★  |      6.5% |        11.3% |    8.9% |
+| ★★   |     26.6% |        27.6% |   27.1% |
+| ★    |     65.9% |        61.1% |   63.5% |
 
 ### Within-Tier Weights
 
 Fitted smallest integer weights per fish using χ² goodness-of-fit (p > 0.05 = acceptable).
 
-#### Alamo Sea — ★★★ (2 fish, 20 observed)
+#### Alamo Sea — ★★★ (3 fish, 27 observed)
 
 | Fish            | Count | Observed % | Weight | Expected % | Residual |
 |-----------------|------:|-----------:|-------:|-----------:|---------:|
-| Silver Trevally |    13 |      65.0% |      1 |      50.0% |     +3.0 |
-| Great Barracuda |     7 |      35.0% |      1 |      50.0% |     -3.0 |
+| Silver Trevally |    17 |      63.0% |      3 |      60.0% |     +0.8 |
+| Great Barracuda |     7 |      25.9% |      1 |      20.0% |     +1.6 |
+| Bluefin Tuna    |     3 |      11.1% |      1 |      20.0% |     -2.4 |
 
-χ² = 1.80, df = 1, p = 0.180 — good fit
+χ² = 1.58, df = 2, p = 0.454 — good fit
 
-#### Alamo Sea — ★★ (6 fish, 83 observed)
+#### Alamo Sea — ★★ (6 fish, 111 observed)
 
 | Fish             | Count | Observed % | Weight | Expected % | Residual |
 |------------------|------:|-----------:|-------:|-----------:|---------:|
-| Trout            |    21 |      25.3% |      8 |      24.2% |     +0.9 |
-| Blue Warehou     |    21 |      25.3% |      8 |      24.2% |     +0.9 |
-| Southern Garfish |    18 |      21.7% |      8 |      24.2% |     -2.1 |
-| Southern Tuna    |     9 |      10.8% |      3 |       9.1% |     +1.5 |
-| Snow Crab        |     7 |       8.4% |      3 |       9.1% |     -0.5 |
-| Golden Perch     |     7 |       8.4% |      3 |       9.1% |     -0.5 |
+| Southern Garfish |    30 |      27.0% |      5 |      23.8% |     +3.6 |
+| Trout            |    25 |      22.5% |      5 |      23.8% |     -1.4 |
+| Blue Warehou     |    24 |      21.6% |      5 |      23.8% |     -2.4 |
+| Golden Perch     |    12 |      10.8% |      2 |       9.5% |     +1.4 |
+| Snow Crab        |    11 |       9.9% |      2 |       9.5% |     +0.4 |
+| Southern Tuna    |     9 |       8.1% |      2 |       9.5% |     -1.6 |
 
-χ² = 0.66, df = 5, p = 0.985 — excellent fit
+χ² = 1.23, df = 5, p = 0.942 — excellent fit
 
-#### Alamo Sea — ★ (7 fish, 218 observed)
+#### Alamo Sea — ★ (7 fish, 275 observed)
 
 | Fish      | Count | Observed % | Weight | Expected % | Residual |
 |-----------|------:|-----------:|-------:|-----------:|---------:|
-| Albacore  |    47 |      21.6% |      9 |      21.4% |     +0.3 |
-| Broadbill |    39 |      17.9% |      7 |      16.7% |     +2.7 |
-| Scollop   |    38 |      17.4% |      7 |      16.7% |     +1.7 |
-| Halibut   |    31 |      14.2% |      7 |      16.7% |     -5.3 |
-| Morwhong  |    22 |      10.1% |      4 |       9.5% |     +1.2 |
-| Flathead  |    22 |      10.1% |      4 |       9.5% |     +1.2 |
-| Redfish   |    19 |       8.7% |      4 |       9.5% |     -1.8 |
+| Albacore  |    63 |      22.9% |      7 |      22.6% |     +0.9 |
+| Scollop   |    47 |      17.1% |      5 |      16.1% |     +2.6 |
+| Halibut   |    43 |      15.6% |      5 |      16.1% |     -1.4 |
+| Broadbill |    42 |      15.3% |      5 |      16.1% |     -2.4 |
+| Morwhong  |    27 |       9.8% |      3 |       9.7% |     +0.4 |
+| Flathead  |    27 |       9.8% |      3 |       9.7% |     +0.4 |
+| Redfish   |    26 |       9.5% |      3 |       9.7% |     -0.6 |
 
-χ² = 1.35, df = 6, p = 0.969 — excellent fit
+χ² = 0.36, df = 6, p = 0.999 — excellent fit
 
 #### Land Act Dam — ★★★ (3 fish, 23 observed)
 

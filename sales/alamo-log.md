@@ -71,3 +71,22 @@ Golden Perch	5
 Silver Trevally	5
 Great Barracuda	3
 --sold
+Albacore	16
+Broadbill	3
+Halibut	12
+Southern Garfish	12
+Trout	4
+Scollop	9
+Flathead	5
+Bluefin Tuna	3
+Golden Perch	5
+Redfish	7
+Snow Crab	4
+Blue Warehou	3
+3 Eyed Fish	1
+Esky	1
+Esky	1
+Patch Kit	1
+Silver Trevally	4
+Morwhong	5
+Southern Tuna   3
