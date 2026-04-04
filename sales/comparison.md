@@ -6,26 +6,24 @@ Assuming 100s wait for bite + 15s reel-in = 115s per fish (31.3 fish/hour).
 
 ~ = estimated (not yet observed in catch data)
 
-| Location     | Fish Caught | $/Fish (sales) | Available Bundles                                      | $/Fish (bundles) | $/Fish (total) |  $/Hour |
-|--------------|------------:|---------------:|--------------------------------------------------------|-----------------:|---------------:|--------:|
-| Alamo Sea    |         420 |         $1,472 | Gold Multizone #1~, Alamo Starter, Low Level Multizone |             $655 |     **$2,127** | $66,595 |
-| Land Act Dam |         203 |         $1,670 | Gold Multizone #1~, Low Level Multizone                |             $393 |     **$2,063** | $64,583 |
-| Roxwood      |          35 |         $1,794 | Gold Multizone #1~, Low Level Multizone                |             $371 |     **$2,166** | $67,796 |
+| Location     | Fish Caught | $/Fish (sales) | Available Bundles                                     | $/Fish (bundles) | $/Fish (total) |  $/Hour |
+|--------------|------------:|---------------:|-------------------------------------------------------|-----------------:|---------------:|--------:|
+| Alamo Sea    |         420 |         $1,472 | Gold Multizone #1, Alamo Starter, Low Level Multizone |             $655 |     **$2,127** | $66,595 |
+| Land Act Dam |         203 |         $1,670 | Gold Multizone #1, Low Level Multizone                |             $393 |     **$2,063** | $64,583 |
+| Roxwood      |          78 |         $1,785 | Gold Multizone #1, Low Level Multizone                |             $196 |     **$1,980** | $61,987 |
 
 ## Optimal Allocation
-
-Note: some bundle fish probabilities are estimated (~).
 
 Optimal time split across locations to maximize total $/hour (considering both sale value and cross-location bundle completions):
 
 | Location     | Time % | $/Fish (sales) | $/Hour (solo) |
 |--------------|-------:|---------------:|--------------:|
-| Alamo Sea    |    18% |         $1,472 |       $52,800 |
-| Land Act Dam |    46% |         $1,670 |       $52,284 |
-| Roxwood      |    36% |         $1,794 |       $56,169 |
-| **Combined** |   100% |                |   **$61,225** |
+| Alamo Sea    |    16% |         $1,472 |       $52,800 |
+| Land Act Dam |    39% |         $1,670 |       $52,284 |
+| Roxwood      |    45% |         $1,785 |       $55,866 |
+| **Combined** |   100% |                |   **$60,389** |
 
-Splitting across locations yields **$61,225**/hour vs **$56,169**/hour best solo (+$5,056/hour, +9.0%).
+Splitting across locations yields **$60,389**/hour vs **$55,866**/hour best solo (+$4,523/hour, +8.1%).
 
 ## Bundle Details
 
@@ -37,10 +35,10 @@ Splitting across locations yields **$61,225**/hour vs **$56,169**/hour best solo
 
 ### Cross-Location
 
-| Bundle              | Fish                             |   Bonus | Avg Fish to Complete | Avg Time | Bonus/Fish | Catch Rates                                                                                                          |
-|---------------------|----------------------------------|--------:|---------------------:|---------:|-----------:|----------------------------------------------------------------------------------------------------------------------|
-| Gold Multizone #1   | Bluefin Tuna, Musky, Dolphinfish | $12,750 |                  185 |  354 min |        $69 | Bluefin Tuna @ Alamo Sea: 3/420 (0.7%) \| Musky @ Land Act Dam: 11/203 (5.4%) \| Dolphinfish @ Roxwood: ~3.8% (est.) |
-| Low Level Multizone | Scollop, Carp, Grenadier         | $11,000 |                   49 |   94 min |       $225 | Scollop @ Alamo Sea: 47/420 (11.2%) \| Carp @ Land Act Dam: 9/203 (4.4%) \| Grenadier @ Roxwood: 2/35 (5.7%)         |
+| Bundle              | Fish                             |   Bonus | Avg Fish to Complete | Avg Time | Bonus/Fish | Catch Rates                                                                                                         |
+|---------------------|----------------------------------|--------:|---------------------:|---------:|-----------:|---------------------------------------------------------------------------------------------------------------------|
+| Gold Multizone #1   | Bluefin Tuna, Musky, Dolphinfish | $12,750 |                  236 |  453 min |        $54 | Bluefin Tuna @ Alamo Sea: 3/420 (0.7%) \| Musky @ Land Act Dam: 11/203 (5.4%) \| Dolphinfish @ Roxwood: 1/78 (1.3%) |
+| Low Level Multizone | Scollop, Carp, Grenadier         | $11,000 |                   57 |  110 min |       $191 | Scollop @ Alamo Sea: 47/420 (11.2%) \| Carp @ Land Act Dam: 9/203 (4.4%) \| Grenadier @ Roxwood: 3/78 (3.8%)        |
 
 ## Drop Rate Analysis
 
@@ -51,9 +49,9 @@ Tier drop rates are consistent across locations, suggesting a fixed game mechani
 | Tier        | Alamo Sea | Land Act Dam | Roxwood | Average |
 |-------------|----------:|-------------:|--------:|--------:|
 | ★★★★ purple |      0.2% |         0.0% |    0.0% |    0.1% |
-| ★★★         |      6.4% |        11.3% |   11.4% |    9.7% |
-| ★★          |     26.4% |        27.6% |   25.7% |   26.6% |
-| ★           |     65.5% |        61.1% |   62.9% |   63.1% |
+| ★★★         |      6.4% |        11.3% |   10.3% |    9.3% |
+| ★★          |     26.4% |        27.6% |   29.5% |   27.8% |
+| ★           |     65.5% |        61.1% |   60.3% |   62.3% |
 
 ### Within-Tier Weights
 
@@ -134,38 +132,39 @@ Fitted smallest integer weights per fish using χ² goodness-of-fit (p > 0.05 = 
 
 χ² = 2.46, df = 7, p = 0.930 — excellent fit
 
-#### Roxwood — ★★★ (2 fish, 4 observed)
+#### Roxwood — ★★★ (3 fish, 8 observed)
 
 | Fish          | Count | Observed % | Weight | Expected % | Residual |
 |---------------|------:|-----------:|-------:|-----------:|---------:|
-| King Mackerel |     2 |      50.0% |      1 |      50.0% |     +0.0 |
-| Grenadier     |     2 |      50.0% |      1 |      50.0% |     +0.0 |
+| King Mackerel |     4 |      50.0% |      1 |      33.3% |     +1.3 |
+| Grenadier     |     3 |      37.5% |      1 |      33.3% |     +0.3 |
+| Dolphinfish   |     1 |      12.5% |      1 |      33.3% |     -1.7 |
 
-χ² = 0.00, df = 1, p = 1.000 — excellent fit
+χ² = 1.75, df = 2, p = 0.417 — good fit
 
-#### Roxwood — ★★ (6 fish, 9 observed)
+#### Roxwood — ★★ (6 fish, 23 observed)
 
 | Fish         | Count | Observed % | Weight | Expected % | Residual |
 |--------------|------:|-----------:|-------:|-----------:|---------:|
-| Snapper      |     2 |      22.2% |      1 |      16.7% |     +0.5 |
-| Gummy Shark  |     2 |      22.2% |      1 |      16.7% |     +0.5 |
-| Silver Perch |     2 |      22.2% |      1 |      16.7% |     +0.5 |
-| Amberjack    |     1 |      11.1% |      1 |      16.7% |     -0.5 |
-| Brown Trout  |     1 |      11.1% |      1 |      16.7% |     -0.5 |
-| Red Snapper  |     1 |      11.1% |      1 |      16.7% |     -0.5 |
+| Snapper      |     5 |      21.7% |      9 |      19.1% |     +0.6 |
+| Amberjack    |     5 |      21.7% |      9 |      19.1% |     +0.6 |
+| Brown Trout  |     5 |      21.7% |      9 |      19.1% |     +0.6 |
+| Gummy Shark  |     4 |      17.4% |      9 |      19.1% |     -0.4 |
+| Silver Perch |     3 |      13.0% |      9 |      19.1% |     -1.4 |
+| Red Snapper  |     1 |       4.3% |      2 |       4.3% |     +0.0 |
 
-χ² = 1.00, df = 5, p = 0.963 — excellent fit
+χ² = 0.73, df = 5, p = 0.981 — excellent fit
 
-#### Roxwood — ★ (7 fish, 22 observed)
+#### Roxwood — ★ (7 fish, 47 observed)
 
 | Fish               | Count | Observed % | Weight | Expected % | Residual |
 |--------------------|------:|-----------:|-------:|-----------:|---------:|
-| Grouper            |     8 |      36.4% |     10 |      35.7% |     +0.1 |
-| Australian Herring |     4 |      18.2% |      3 |      10.7% |     +1.6 |
-| Sand Whiting       |     3 |      13.6% |      3 |      10.7% |     +0.6 |
-| Sandy Sprat        |     2 |       9.1% |      3 |      10.7% |     -0.4 |
-| Ocean Perch        |     2 |       9.1% |      3 |      10.7% |     -0.4 |
-| Dungeness Crab     |     2 |       9.1% |      3 |      10.7% |     -0.4 |
-| Ocean Jacket       |     1 |       4.5% |      3 |      10.7% |     -1.4 |
+| Grouper            |    14 |      29.8% |     10 |      23.8% |     +2.8 |
+| Sandy Sprat        |    11 |      23.4% |     10 |      23.8% |     -0.2 |
+| Dungeness Crab     |     8 |      17.0% |     10 |      23.8% |     -3.2 |
+| Australian Herring |     4 |       8.5% |      3 |       7.1% |     +0.6 |
+| Sand Whiting       |     4 |       8.5% |      3 |       7.1% |     +0.6 |
+| Ocean Jacket       |     3 |       6.4% |      3 |       7.1% |     -0.4 |
+| Ocean Perch        |     3 |       6.4% |      3 |       7.1% |     -0.4 |
 
-χ² = 2.27, df = 6, p = 0.894 — excellent fit
+χ² = 1.94, df = 6, p = 0.925 — excellent fit

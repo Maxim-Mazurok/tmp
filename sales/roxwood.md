@@ -4,19 +4,20 @@
 
 | Fish               |  Count |        % | Stars | Bundles             |
 |--------------------|-------:|---------:|-------|---------------------|
-| King Mackerel      |      2 |     5.7% | ★★★   |                     |
-| Grenadier          |      2 |     5.7% | ★★★   | Low Level Multizone |
-| Snapper            |      2 |     5.7% | ★★    |                     |
-| Gummy Shark        |      2 |     5.7% | ★★    |                     |
-| Silver Perch       |      2 |     5.7% | ★★    |                     |
-| Amberjack          |      1 |     2.9% | ★★    |                     |
-| Brown Trout        |      1 |     2.9% | ★★    |                     |
-| Red Snapper        |      1 |     2.9% | ★★    | Silver Multizone #2 |
-| Grouper            |      8 |    22.9% | ★     |                     |
-| Australian Herring |      4 |    11.4% | ★     |                     |
-| Sand Whiting       |      3 |     8.6% | ★     |                     |
-| Sandy Sprat        |      2 |     5.7% | ★     |                     |
-| Ocean Perch        |      2 |     5.7% | ★     | Bronze Multizone #1 |
-| Dungeness Crab     |      2 |     5.7% | ★     |                     |
-| Ocean Jacket       |      1 |     2.9% | ★     |                     |
-| **Total**          | **35** | **100%** |       |                     |
+| King Mackerel      |      4 |     5.1% | ★★★   |                     |
+| Grenadier          |      3 |     3.8% | ★★★   | Low Level Multizone |
+| Dolphinfish        |      1 |     1.3% | ★★★   | Gold Multizone #1   |
+| Snapper            |      5 |     6.4% | ★★    |                     |
+| Amberjack          |      5 |     6.4% | ★★    |                     |
+| Brown Trout        |      5 |     6.4% | ★★    |                     |
+| Gummy Shark        |      4 |     5.1% | ★★    |                     |
+| Silver Perch       |      3 |     3.8% | ★★    |                     |
+| Red Snapper        |      1 |     1.3% | ★★    | Silver Multizone #2 |
+| Grouper            |     14 |    17.9% | ★     |                     |
+| Sandy Sprat        |     11 |    14.1% | ★     |                     |
+| Dungeness Crab     |      8 |    10.3% | ★     |                     |
+| Australian Herring |      4 |     5.1% | ★     |                     |
+| Sand Whiting       |      4 |     5.1% | ★     |                     |
+| Ocean Jacket       |      3 |     3.8% | ★     |                     |
+| Ocean Perch        |      3 |     3.8% | ★     | Bronze Multizone #1 |
+| **Total**          | **78** | **100%** |       |                     |
