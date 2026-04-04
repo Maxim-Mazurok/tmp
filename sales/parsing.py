@@ -10,6 +10,7 @@ from constants import (
     PRICES,
     REGIONS,
     SALES_DIR,
+    TIER_DROP_PERCENTAGES,
     TIER_PRICES,
 )
 
@@ -124,8 +125,9 @@ def estimate_fish_probability(
 ) -> float | None:
     """Estimate the catch probability for an unseen fish at a location.
 
-    Uses the location's observed tier distribution and the total species count
-    in that tier to estimate an equal-weight probability.
+    Uses the location's observed tier distribution and the percentage template
+    for that tier. Assigns the lowest percentage slot since unseen fish are
+    likely the rarest.
     """
     _, star_count, _ = PRICES[fish_name]
     total = sum(location_counts.values())
@@ -139,4 +141,65 @@ def estimate_fish_probability(
 
     species_in_tier = _LOCATION_TIER_SPECIES.get(location, {}).get(star_count, 1)
     tier_rate = tier_caught / total
+
+    # Use the lowest percentage from the template for unseen fish
+    template = TIER_DROP_PERCENTAGES.get(star_count)
+    if template and species_in_tier <= len(template):
+        lowest_percentage = template[species_in_tier - 1]
+        template_sum = sum(template[:species_in_tier])
+        return tier_rate * lowest_percentage / template_sum
+
     return tier_rate / species_in_tier
+
+
+def model_fish_probability(
+    fish_name: str,
+    location: str,
+    location_counts: Counter,
+) -> float | None:
+    """Compute the model-based probability for a fish at a location.
+
+    Uses the tier's percentage template to assign probabilities based on the
+    fish's rank within its tier (sorted by observed count, descending).
+    """
+    _, star_count, _ = PRICES[fish_name]
+    template = TIER_DROP_PERCENTAGES.get(star_count)
+    if template is None:
+        return None
+
+    total = sum(location_counts.values())
+    if total == 0:
+        return None
+
+    # Collect all fish in this tier at this location, sorted by count
+    tier_fish = []
+    for name, count in location_counts.items():
+        if name in PRICES and PRICES[name][1] == star_count:
+            tier_fish.append((name, count))
+    tier_fish.sort(key=lambda pair: -pair[1])
+
+    tier_total = sum(count for _, count in tier_fish)
+    if tier_total == 0:
+        return None
+
+    tier_rate = tier_total / total
+
+    # Find rank of this fish in tier
+    species_in_tier = _LOCATION_TIER_SPECIES.get(location, {}).get(star_count, 1)
+    fish_rank = None
+    for rank, (name, _count) in enumerate(tier_fish):
+        if name == fish_name:
+            fish_rank = rank
+            break
+
+    if fish_rank is None:
+        # Unseen fish gets the lowest slot
+        fish_rank = species_in_tier - 1
+
+    used_count = min(species_in_tier, len(template))
+    if fish_rank >= used_count:
+        fish_rank = used_count - 1
+
+    percentage = template[fish_rank]
+    template_sum = sum(template[:used_count])
+    return tier_rate * percentage / template_sum

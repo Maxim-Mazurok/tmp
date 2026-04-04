@@ -16,6 +16,7 @@ from constants import (
     SECONDS_REELING_IN,
     SECONDS_WAITING_FOR_BITE,
     SPECIAL_FISH_NOTES,
+    TIER_DROP_PERCENTAGES,
     TIER_PRICES,
 )
 from markdown import format_markdown_table
@@ -25,11 +26,12 @@ from parsing import (
     estimate_fish_probability,
     fish_location,
     get_location,
+    model_fish_probability,
     parse_log,
     stars_sort_key,
     stars_string,
 )
-from stats import fit_integer_weights
+from stats import fit_integer_weights, fit_percentage_template
 
 
 def build_table(counts: Counter) -> str:
@@ -256,6 +258,25 @@ def _compute_bundle_contributions(
     return contributions
 
 
+def _compute_model_sale_value(region_name: str, counts: Counter) -> float:
+    """Compute model-based $/fish (sales) using percentage templates.
+
+    For each fish, uses the model probability instead of observed frequency.
+    """
+    total_fish = sum(counts.values())
+    model_value = 0.0
+
+    for fish_name in counts:
+        if fish_name not in PRICES:
+            continue
+        price = PRICES[fish_name][0]
+        probability = model_fish_probability(fish_name, region_name, counts)
+        if probability is not None:
+            model_value += probability * price
+
+    return model_value
+
+
 def build_comparison_table() -> str:
     """Build a revenue comparison table using total fish frequencies."""
     region_data: dict[str, Counter] = {}
@@ -286,7 +307,8 @@ def build_comparison_table() -> str:
             for name in counts
             if name in PRICES
         )
-        sale_value_per_fish = total_sale_value / total_fish
+        observed_sale_per_fish = total_sale_value / total_fish
+        model_sale_per_fish = _compute_model_sale_value(region_name, counts)
 
         location_bundles = bundle_contributions.get(region_name, [])
         bundle_value_per_fish = sum(bonus for _, bonus, _ in location_bundles)
@@ -295,19 +317,24 @@ def build_comparison_table() -> str:
             for name, _, estimated in location_bundles
         ]
 
-        total_value_per_fish = sale_value_per_fish + bundle_value_per_fish
+        observed_total = observed_sale_per_fish + bundle_value_per_fish
+        model_total = model_sale_per_fish + bundle_value_per_fish
 
-        bundles_string = ", ".join(available_bundle_names) if available_bundle_names else "none"
-        revenue_per_hour = total_value_per_fish * FISH_PER_HOUR
+        bundles_string = (
+            ", ".join(available_bundle_names) if available_bundle_names
+            else "none"
+        )
 
         rows.append((
             region_name,
             str(total_fish),
-            f"${sale_value_per_fish:,.0f}",
+            f"${observed_sale_per_fish:,.0f}",
+            f"${model_sale_per_fish:,.0f}",
             bundles_string,
             f"${bundle_value_per_fish:,.0f}",
-            f"**${total_value_per_fish:,.0f}**",
-            f"${revenue_per_hour:,.0f}",
+            f"${observed_total:,.0f}",
+            f"**${model_total:,.0f}**",
+            f"${model_total * FISH_PER_HOUR:,.0f}",
         ))
 
     if not rows:
@@ -315,12 +342,14 @@ def build_comparison_table() -> str:
 
     return format_markdown_table(
         headers=(
-            "Location", "Fish Caught", "$/Fish (sales)",
-            "Available Bundles", "$/Fish (bundles)", "$/Fish (total)",
-            "$/Hour",
+            "Location", "Fish Caught",
+            "$/Fish observed", "$/Fish model",
+            "Available Bundles", "$/Fish (bundles)",
+            "$/Fish total (obs)", "$/Fish total (model)",
+            "$/Hour (model)",
         ),
         rows=rows,
-        right_aligned_columns={1, 2, 4, 5, 6},
+        right_aligned_columns={1, 2, 3, 5, 6, 7, 8},
     )
 
 
@@ -463,6 +492,7 @@ def build_optimal_allocation(region_data: dict[str, Counter]) -> str:
         return ""
 
     sale_values: dict[str, float] = {}
+    model_sale_values: dict[str, float] = {}
     for location, counts in region_data.items():
         total_fish = sum(counts.values())
         total_value = sum(
@@ -471,6 +501,7 @@ def build_optimal_allocation(region_data: dict[str, Counter]) -> str:
             if name in PRICES
         )
         sale_values[location] = total_value / total_fish
+        model_sale_values[location] = _compute_model_sale_value(location, counts)
 
     bundles = _resolve_available_bundles(region_data)
 
@@ -520,9 +551,45 @@ def build_optimal_allocation(region_data: dict[str, Counter]) -> str:
         return ""
 
     baseline_revenues: dict[str, float] = {}
+    model_baseline_revenues: dict[str, float] = {}
     for location in locations:
         solo = {loc: (1.0 if loc == location else 0.0) for loc in locations}
-        baseline_revenues[location] = _compute_revenue(solo, sale_values, bundles)
+        baseline_revenues[location] = _compute_revenue(
+            solo, sale_values, bundles,
+        )
+        model_baseline_revenues[location] = _compute_revenue(
+            solo, model_sale_values, bundles,
+        )
+
+    # Optimize using model sale values
+    model_best_revenue = -1.0
+    model_best_fractions: dict[str, float] = {}
+
+    if len(locations) == 2:
+        for step_a in range(granularity + 1):
+            fraction_a = step_a / granularity
+            fraction_b = 1.0 - fraction_a
+            fractions = {locations[0]: fraction_a, locations[1]: fraction_b}
+            revenue = _compute_revenue(fractions, model_sale_values, bundles)
+            if revenue > model_best_revenue:
+                model_best_revenue = revenue
+                model_best_fractions = fractions.copy()
+    elif len(locations) == 3:
+        for step_a in range(granularity + 1):
+            fraction_a = step_a / granularity
+            remaining = granularity - step_a
+            for step_b in range(remaining + 1):
+                fraction_b = step_b / granularity
+                fraction_c = 1.0 - fraction_a - fraction_b
+                fractions = {
+                    locations[0]: fraction_a,
+                    locations[1]: fraction_b,
+                    locations[2]: fraction_c,
+                }
+                revenue = _compute_revenue(fractions, model_sale_values, bundles)
+                if revenue > model_best_revenue:
+                    model_best_revenue = revenue
+                    model_best_fractions = fractions.copy()
 
     lines = ["## Optimal Allocation"]
     if any_estimated:
@@ -537,35 +604,57 @@ def build_optimal_allocation(region_data: dict[str, Counter]) -> str:
 
     allocation_rows = []
     for location in locations:
-        fraction = best_fractions.get(location, 0)
+        observed_fraction = best_fractions.get(location, 0)
+        model_fraction = model_best_fractions.get(location, 0)
         allocation_rows.append((
             location,
-            f"{fraction:.0%}",
+            f"{observed_fraction:.0%}",
             f"${sale_values[location]:,.0f}",
             f"${baseline_revenues[location]:,.0f}",
+            f"{model_fraction:.0%}",
+            f"${model_sale_values[location]:,.0f}",
+            f"${model_baseline_revenues[location]:,.0f}",
         ))
     allocation_rows.append((
         "**Combined**",
         "100%",
         "",
         f"**${best_revenue:,.0f}**",
+        "100%",
+        "",
+        f"**${model_best_revenue:,.0f}**",
     ))
 
     lines.append(format_markdown_table(
-        headers=("Location", "Time %", "$/Fish (sales)", "$/Hour (solo)"),
+        headers=(
+            "Location",
+            "Time % (obs)", "$/Fish (obs)", "$/Hour (obs)",
+            "Time % (model)", "$/Fish (model)", "$/Hour (model)",
+        ),
         rows=allocation_rows,
-        right_aligned_columns={1, 2, 3},
+        right_aligned_columns={1, 2, 3, 4, 5, 6},
     ))
 
     best_solo = max(baseline_revenues.values())
+    model_best_solo = max(model_baseline_revenues.values())
     uplift = best_revenue - best_solo
     uplift_percentage = (uplift / best_solo) * 100 if best_solo > 0 else 0
+    model_uplift = model_best_revenue - model_best_solo
+    model_uplift_percentage = (
+        (model_uplift / model_best_solo) * 100 if model_best_solo > 0 else 0
+    )
     lines.append("")
     lines.append(
-        f"Splitting across locations yields"
+        f"**Observed:** splitting yields"
         f" **${best_revenue:,.0f}**/hour vs"
         f" **${best_solo:,.0f}**/hour best solo"
         f" (+${uplift:,.0f}/hour, +{uplift_percentage:.1f}%)."
+    )
+    lines.append(
+        f"**Model:** splitting yields"
+        f" **${model_best_revenue:,.0f}**/hour vs"
+        f" **${model_best_solo:,.0f}**/hour best solo"
+        f" (+${model_uplift:,.0f}/hour, +{model_uplift_percentage:.1f}%)."
     )
 
     return "\n".join(lines)
@@ -783,8 +872,9 @@ def build_drop_rate_analysis(region_counts: dict[str, Counter]) -> str:
         "",
         "### Within-Tier Weights",
         "",
-        "Fitted smallest integer weights per fish"
-        " using \u03c7\u00b2 goodness-of-fit (p > 0.05 = acceptable).",
+        "Observed frequencies vs model (percentage template) per fish.",
+        "Model uses shared percentage templates across all locations"
+        " (5% granularity).",
     ])
 
     for region_name, counts in region_counts.items():
@@ -804,8 +894,17 @@ def build_drop_rate_analysis(region_counts: dict[str, Counter]) -> str:
             observed = [count for _name, count in fish_in_tier]
             tier_total = sum(observed)
 
-            weights, chi_squared, p_value = fit_integer_weights(observed)
+            weights, weight_chi_squared, weight_p = fit_integer_weights(observed)
             weight_sum = sum(weights)
+
+            template = TIER_DROP_PERCENTAGES.get(stars)
+            if template:
+                percentages, template_chi_squared, template_p = (
+                    fit_percentage_template(observed, template)
+                )
+                percentage_sum = sum(percentages)
+            else:
+                percentages = None
 
             star_label = "\u2605" * stars
             sections.extend([
@@ -818,41 +917,86 @@ def build_drop_rate_analysis(region_counts: dict[str, Counter]) -> str:
             weight_rows: list[tuple[str, ...]] = []
             for i, (name, count) in enumerate(fish_in_tier):
                 observed_percentage = count / tier_total * 100
-                expected_percentage = weights[i] / weight_sum * 100
+                weight_expected = weights[i] / weight_sum * 100
                 expected_count = tier_total * weights[i] / weight_sum
                 residual = count - expected_count
-                weight_rows.append((
-                    name,
-                    str(count),
-                    f"{observed_percentage:.1f}%",
-                    str(weights[i]),
-                    f"{expected_percentage:.1f}%",
-                    f"{residual:+.1f}",
-                ))
+
+                if percentages:
+                    model_percentage = percentages[i] / percentage_sum * 100
+                    model_expected_count = tier_total * percentages[i] / percentage_sum
+                    model_residual = count - model_expected_count
+                    weight_rows.append((
+                        name,
+                        str(count),
+                        f"{observed_percentage:.1f}%",
+                        str(weights[i]),
+                        f"{weight_expected:.1f}%",
+                        f"{percentages[i]}%",
+                        f"{model_percentage:.1f}%",
+                        f"{model_residual:+.1f}",
+                    ))
+                else:
+                    weight_rows.append((
+                        name,
+                        str(count),
+                        f"{observed_percentage:.1f}%",
+                        str(weights[i]),
+                        f"{weight_expected:.1f}%",
+                        "",
+                        "",
+                        f"{residual:+.1f}",
+                    ))
+
+            if percentages:
+                headers = (
+                    "Fish", "Count", "Observed %",
+                    "Weight", "Weight %",
+                    "Model %", "Model % (norm)", "Residual",
+                )
+            else:
+                headers = (
+                    "Fish", "Count", "Observed %",
+                    "Weight", "Weight %",
+                    "Model %", "Model % (norm)", "Residual",
+                )
 
             weight_table = format_markdown_table(
-                headers=(
-                    "Fish", "Count", "Observed %",
-                    "Weight", "Expected %", "Residual",
-                ),
+                headers=headers,
                 rows=weight_rows,
-                right_aligned_columns={1, 2, 3, 4, 5},
+                right_aligned_columns={1, 2, 3, 4, 5, 6, 7},
             )
             sections.append(weight_table)
 
-            quality = (
-                "excellent" if p_value > 0.5
-                else "good" if p_value > 0.1
-                else "acceptable" if p_value > 0.05
+            weight_quality = (
+                "excellent" if weight_p > 0.5
+                else "good" if weight_p > 0.1
+                else "acceptable" if weight_p > 0.05
                 else "poor"
             )
             sections.extend([
                 "",
-                f"\u03c7\u00b2 = {chi_squared:.2f},"
+                f"Weight fit: \u03c7\u00b2 = {weight_chi_squared:.2f},"
                 f" df = {len(fish_in_tier) - 1},"
-                f" p = {p_value:.3f}"
-                f" \u2014 {quality} fit",
+                f" p = {weight_p:.3f}"
+                f" \u2014 {weight_quality}",
             ])
+
+            if percentages:
+                template_quality = (
+                    "excellent" if template_p > 0.5
+                    else "good" if template_p > 0.1
+                    else "acceptable" if template_p > 0.05
+                    else "poor"
+                )
+                template_display = "/".join(
+                    f"{percentage}%" for percentage in template
+                )
+                sections.append(
+                    f"Model fit ({template_display}):"
+                    f" \u03c7\u00b2 = {template_chi_squared:.2f},"
+                    f" p = {template_p:.3f}"
+                    f" \u2014 {template_quality}",
+                )
 
     return "\n".join(sections)
 

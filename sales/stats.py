@@ -105,3 +105,32 @@ def fit_integer_weights(
         chi_squared,
         p_value,
     )
+
+
+def fit_percentage_template(
+    observed_counts: list[int],
+    template: tuple[int, ...],
+) -> tuple[list[int], float, float]:
+    """Fit a percentage template to observed data.
+
+    Assigns template percentages to fish sorted by descending count.
+    Returns (assigned_percentages, chi_squared, p_value).
+    If the template has more slots than observed fish, only the first N
+    entries are used (renormalized).
+    """
+    fish_count = len(observed_counts)
+    total = sum(observed_counts)
+    degrees_of_freedom = fish_count - 1
+
+    percentages = list(template[:fish_count])
+    percentage_sum = sum(percentages)
+
+    expected = [total * percentage / percentage_sum for percentage in percentages]
+    chi_squared_value = sum(
+        (observed_counts[i] - expected[i]) ** 2 / expected[i]
+        for i in range(fish_count)
+        if expected[i] > 0
+    )
+    p_value = chi_squared_p_value(chi_squared_value, degrees_of_freedom)
+
+    return percentages, chi_squared_value, p_value
