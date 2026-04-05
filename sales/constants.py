@@ -155,7 +155,7 @@ SPECIAL_FISH_NOTES: dict[str, str] = {
 
 # Time per fish (seconds) – bite wait varies by location
 SECONDS_WAITING_FOR_BITE: dict[str, int] = {
-    "Alamo Sea": 80,
+    "Alamo Sea": 90,
     "Dam": 90,
     "Roxwood": 100,
 }
