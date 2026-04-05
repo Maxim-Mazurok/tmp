@@ -110,7 +110,7 @@ Heavy storm weather may increase chances.
 | Bluefin Tuna         |  $2,000 | xxx         | Alamo Sea   |
 | Blue Warehou         |  $1,650 | xx          | Alamo Sea   |
 | Lion Fish            |  $1,850 | x           | Ocean       |
-| Banded Butterflyfish     |  $1,500 | x           | Dam         |
+| Banded Butterflyfish |  $1,500 | x           | Dam         |
 | Baby Pufferfish      | $10,000 | xxxx purple | Special     |
 | Bluehead Wrasse      |  $2,150 | x green     | Humane Labs |
 | Carp                 |  $1,850 | xx          | Dam         |

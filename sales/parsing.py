@@ -36,7 +36,7 @@ def stars_string(name: str) -> str:
     _price, star_count, color = PRICES[name]
     if star_count == 0:
         return "-"
-    result = "\u2605" * star_count
+    result = "x" * star_count
     if color:
         result += f" {color}"
     return result

@@ -85,7 +85,7 @@ def build_prices_table() -> str:
         if stars == 0:
             star_display = "-"
         else:
-            star_display = "\u2605" * stars
+            star_display = "x" * stars
             if color:
                 star_display += f" {color}"
         location = get_location(price, stars, color)
@@ -122,7 +122,7 @@ def build_special_fish_section(region_counts: dict[str, Counter]) -> str:
         if stars == 0:
             star_display = "-"
         else:
-            star_display = "\u2605" * stars
+            star_display = "x" * stars
             if color:
                 star_display += f" {color}"
         locations = sightings.get(name, [])
@@ -146,7 +146,7 @@ def build_special_fish_section(region_counts: dict[str, Counter]) -> str:
     lines = [
         "## Special Fish",
         "",
-        "Special fish (\u2605\u2605\u2605\u2605 purple) are zone-independent"
+        "Special fish (xxxx purple) are zone-independent"
         " \u2014 they can appear at any fishing location.",
         "Heavy storm weather may increase chances.",
         "",
@@ -842,7 +842,7 @@ def build_drop_rate_analysis(region_counts: dict[str, Counter]) -> str:
 
     tier_rows: list[tuple[str, ...]] = []
     for stars in tier_levels:
-        star_label = "\u2605" * stars
+        star_label = "x" * stars
         if stars == 4:
             star_label += " purple"
         values: list[str] = [star_label]
@@ -916,7 +916,7 @@ def build_drop_rate_analysis(region_counts: dict[str, Counter]) -> str:
             else:
                 percentages = None
 
-            star_label = "\u2605" * stars
+            star_label = "x" * stars
             sections.extend([
                 "",
                 f"#### {region_name} \u2014 {star_label}"
@@ -1041,7 +1041,7 @@ def main() -> None:
     for location, tiers in TIER_PRICES.items():
         prices_header += f"\n| {location:<12} | ${tiers[1]:,} | ${tiers[2]:,} | ${tiers[3]:,} |"
     prices_header += (
-        "\n\nGreen stars (\u2605 green) = Humane Labs tier."
+        "\n\nGreen stars (x green) = Humane Labs tier."
         " Special fish have fixed prices.\n\n"
     )
     special_section = build_special_fish_section(region_counts)
