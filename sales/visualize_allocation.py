@@ -19,10 +19,10 @@ from matplotlib.colors import LinearSegmentedColormap
 
 from constants import (
     BUNDLES,
-    FISH_PER_HOUR,
     PRICES,
     REGIONS,
     SALES_DIR,
+    fish_per_hour,
 )
 from parsing import parse_log
 from update_sales import (
@@ -258,8 +258,8 @@ def figure_2_revenue_decomposition(
             for loc in locations
         }
 
-        sale_part = FISH_PER_HOUR * sum(
-            fractions[loc] * sale_values[loc] for loc in locations
+        sale_part = sum(
+            fish_per_hour(loc) * fractions[loc] * sale_values[loc] for loc in locations
         )
         total_part = _compute_revenue(fractions, sale_values, bundles)
         bundle_part = total_part - sale_part
@@ -387,7 +387,7 @@ def figure_3_bundle_bottleneck(
                     )
             rate = (
                 fractions[assignment["location"]]
-                * FISH_PER_HOUR
+                * fish_per_hour(assignment["location"])
                 * assignment["probability"]
             )
             fill_rates.append(rate)
@@ -403,7 +403,7 @@ def figure_3_bundle_bottleneck(
     for fish_index, assignment in enumerate(assignments):
         balanced_rate = (
             balanced_fractions[assignment["location"]]
-            * FISH_PER_HOUR
+            * fish_per_hour(assignment["location"])
             * assignment["probability"]
         )
         balanced_x = balanced_fractions[assignment["location"]] * 100
@@ -415,7 +415,7 @@ def figure_3_bundle_bottleneck(
     # All balanced rates should be equal
     balanced_rate = (
         balanced_fractions[assignments[0]["location"]]
-        * FISH_PER_HOUR
+        * fish_per_hour(assignments[0]["location"])
         * assignments[0]["probability"]
     )
     axis.axhline(
@@ -497,8 +497,8 @@ def figure_4_competing_forces(
             + bundle_balanced[loc] * time_step
             for loc in locations
         }
-        sale_part = FISH_PER_HOUR * sum(
-            fractions[loc] * sale_values[loc] for loc in locations
+        sale_part = sum(
+            fish_per_hour(loc) * fractions[loc] * sale_values[loc] for loc in locations
         )
         total_part = _compute_revenue(fractions, sale_values, bundles)
         bundle_part = total_part - sale_part
@@ -676,7 +676,7 @@ def figure_5_min_envelope(
         for assignment in assignments:
             rates = np.array([
                 fractions.get(assignment["location"], 0)
-                * FISH_PER_HOUR
+                * fish_per_hour(assignment["location"])
                 * assignment["probability"]
                 for fractions in fraction_list
             ])
@@ -812,8 +812,8 @@ def figure_6_objective_decomposition(
 
     # Compute sales component (linear)
     sales_curve = np.array([
-        FISH_PER_HOUR * sum(
-            fractions.get(loc, 0) * sale_values[loc]
+        sum(
+            fish_per_hour(loc) * fractions.get(loc, 0) * sale_values[loc]
             for loc in locations
         )
         for fractions in fraction_list
@@ -830,11 +830,11 @@ def figure_6_objective_decomposition(
                 location = next(iter(bundle_locations))
                 fraction = fractions.get(location, 0)
                 bottleneck = min(a["probability"] for a in assignments)
-                value = fraction * FISH_PER_HOUR * bottleneck * bonus
+                value = fraction * fish_per_hour(location) * bottleneck * bonus
             else:
                 rates = [
                     fractions.get(a["location"], 0)
-                    * FISH_PER_HOUR
+                    * fish_per_hour(a["location"])
                     * a["probability"]
                     for a in assignments
                 ]

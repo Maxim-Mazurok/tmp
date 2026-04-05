@@ -153,11 +153,24 @@ SPECIAL_FISH_NOTES: dict[str, str] = {
     "3 Eyed Fish": "heavy storm",
 }
 
-# Time per fish (seconds)
-SECONDS_WAITING_FOR_BITE = 100  # decreases with level ups
-SECONDS_REELING_IN = 15         # improves with skill
-SECONDS_PER_FISH = SECONDS_WAITING_FOR_BITE + SECONDS_REELING_IN
-FISH_PER_HOUR = 3600 / SECONDS_PER_FISH
+# Time per fish (seconds) – bite wait varies by location
+SECONDS_WAITING_FOR_BITE: dict[str, int] = {
+    "Alamo Sea": 80,
+    "Land Act Dam": 90,
+    "Roxwood": 100,
+}
+SECONDS_WAITING_FOR_BITE_DEFAULT = 100  # for unknown locations
+SECONDS_REELING_IN = 15                 # improves with skill
+
+
+def seconds_per_fish(location: str) -> int:
+    """Total seconds per fish at a given location."""
+    return SECONDS_WAITING_FOR_BITE.get(location, SECONDS_WAITING_FOR_BITE_DEFAULT) + SECONDS_REELING_IN
+
+
+def fish_per_hour(location: str) -> float:
+    """Fish catchable per hour at a given location."""
+    return 3600 / seconds_per_fish(location)
 
 # Reverse lookup: fish name -> list of bundle names
 FISH_BUNDLES: dict[str, list[str]] = {}

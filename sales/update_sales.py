@@ -7,17 +7,17 @@ from typing import TypedDict
 from constants import (
     BUNDLES,
     FISH_BUNDLES,
-    FISH_PER_HOUR,
     LOCATION_ORDER,
     PRICES,
     REGIONS,
     SALES_DIR,
-    SECONDS_PER_FISH,
     SECONDS_REELING_IN,
     SECONDS_WAITING_FOR_BITE,
     SPECIAL_FISH_NOTES,
     TIER_DROP_PERCENTAGES,
     TIER_PRICES,
+    fish_per_hour,
+    seconds_per_fish,
 )
 from markdown import format_markdown_table
 from parsing import (
@@ -334,7 +334,7 @@ def build_comparison_table() -> str:
             f"${bundle_value_per_fish:,.0f}",
             f"${observed_total:,.0f}",
             f"**${model_total:,.0f}**",
-            f"${model_total * FISH_PER_HOUR:,.0f}",
+            f"${model_total * fish_per_hour(region_name):,.0f}",
         ))
 
     if not rows:
@@ -451,8 +451,8 @@ def _compute_revenue(
 
     For single-location bundles, the min collapses to f_loc * r * min(p_j).
     """
-    sale_revenue = FISH_PER_HOUR * sum(
-        fractions.get(location, 0) * sale_value
+    sale_revenue = sum(
+        fish_per_hour(location) * fractions.get(location, 0) * sale_value
         for location, sale_value in sale_values.items()
     )
 
@@ -463,10 +463,10 @@ def _compute_revenue(
             location = next(iter(locations))
             fraction = fractions.get(location, 0)
             bottleneck = min(a["probability"] for a in assignments)
-            bundle_revenue += fraction * FISH_PER_HOUR * bottleneck * bonus
+            bundle_revenue += fraction * fish_per_hour(location) * bottleneck * bonus
         else:
             rates = [
-                fractions.get(a["location"], 0) * FISH_PER_HOUR * a["probability"]
+                fractions.get(a["location"], 0) * fish_per_hour(a["location"]) * a["probability"]
                 for a in assignments
             ]
             bundle_revenue += min(rates) * bonus
@@ -688,7 +688,7 @@ def build_bundle_details(region_counts: dict[str, Counter]) -> str:
                 )
             else:
                 expected_fish = expected_fish_to_complete_bundle(fish_probabilities)
-                expected_time_seconds = expected_fish * SECONDS_PER_FISH
+                expected_time_seconds = expected_fish * seconds_per_fish(region_name)
                 expected_time_minutes = expected_time_seconds / 60
                 bonus_per_fish = bundle_info["bonus"] / expected_fish
                 bundle_rows.append((
@@ -775,7 +775,11 @@ def build_bundle_details(region_counts: dict[str, Counter]) -> str:
         total_expected_fish = sum(
             1.0 / p for _, _, p, _ in fish_assignments
         )
-        expected_time_minutes = total_expected_fish * SECONDS_PER_FISH / 60
+        expected_time_seconds = sum(
+            (1.0 / p) * seconds_per_fish(location)
+            for _, location, p, _ in fish_assignments
+        )
+        expected_time_minutes = expected_time_seconds / 60
         bonus_per_fish = bundle_info["bonus"] / total_expected_fish
         fish_details = [detail for _, _, _, detail in fish_assignments]
         cross_location_rows.append((
@@ -1052,11 +1056,13 @@ def main() -> None:
         )
         bundle_details = build_bundle_details(region_counts)
         drop_rate_analysis = build_drop_rate_analysis(region_counts)
+        bite_details = ", ".join(
+            f"{loc} {SECONDS_WAITING_FOR_BITE[loc]}s"
+            for loc in unlocked if loc in SECONDS_WAITING_FOR_BITE
+        )
         time_note = (
-            f"Assuming {SECONDS_WAITING_FOR_BITE}s wait for bite"
-            f" + {SECONDS_REELING_IN}s reel-in"
-            f" = {SECONDS_PER_FISH}s per fish"
-            f" ({FISH_PER_HOUR:.1f} fish/hour)."
+            f"Bite wait by location: {bite_details}."
+            f" Reel-in: {SECONDS_REELING_IN}s."
         )
         estimated_note = "~ = estimated (not yet observed in catch data)"
         content = (

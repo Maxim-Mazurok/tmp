@@ -3,5 +3,6 @@ numpy==2.4.4
 opencv-python
 mss
 pydirectinput
+pytesseract
 scipy
 pytest==9.0.2

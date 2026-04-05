@@ -23,6 +23,7 @@ from config import (
 from detection import BarDetector
 from capture import ScreenCapture, find_game_window
 from control import FishingController, GameState
+from inventory import InventoryHandler
 from projection_calibration import (
     PROJECTION_TIMING_WINDOW_FRAMES,
     resolve_projection_outcome,
@@ -524,6 +525,12 @@ def _handle_idle(state_ctx):
     state_ctx['timing']['cast_start'] = now
     state_ctx['timing']['minigame_start'] = None
     state_ctx['timing']['catch_time'] = None
+
+    # Check for inventory UI before casting
+    inventory = state_ctx['inventory']
+    if inventory.check_and_act(capture=state_ctx['capture'], pydirectinput=pydirectinput):
+        return  # Inventory was open, don't cast yet
+
     if state_ctx['reel_only']:
         state_ctx['state'] = GameState.WAITING
         state_ctx['state_start'] = now
@@ -552,6 +559,11 @@ def _handle_waiting(state_ctx):
     capture = state_ctx['capture']
     debug = state_ctx['debug']
     reel_only = state_ctx['reel_only']
+
+    # Check for inventory UI and auto-move items
+    inventory = state_ctx['inventory']
+    if inventory.check_and_act(capture, pydirectinput):
+        return  # Acted on inventory, skip this polling cycle
 
     # Poll for the minigame bar to appear
     img, region = capture.capture_search_region()
@@ -1022,6 +1034,7 @@ def run_automation(debug=False, reel_only=False):
     capture = ScreenCapture(game_window=game_win)
     detector = BarDetector()
     controller = FishingController()
+    inventory = InventoryHandler()
 
     # Shared state context for handler functions
     state_ctx = {
@@ -1054,6 +1067,7 @@ def run_automation(debug=False, reel_only=False):
         'region': None,
         'debug_recorder': _create_live_debug_recorder(debug),
         'prev_debug_fish_y': None,
+        'inventory': inventory,
         'fish_last_moved': None,
         'fish_last_y': None,
         'progress_last_seen': None,
