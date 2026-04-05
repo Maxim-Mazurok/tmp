@@ -2,6 +2,12 @@
 
 ## Session Log
 
+### Alamo
+
+| Finished            | Rod | Fish | Duration | s/fish |
+|---------------------|----:|-----:|---------:|-------:|
+| 06 Apr 2026 04:15AM |   4 |   41 |  76m 55s | 112.6s |
+
 ### Dam
 
 | Finished            | Rod | Fish | Duration | s/fish |
@@ -19,6 +25,7 @@
 
 | Zone    | Rod | Sessions | Fish | Avg s/fish |
 |---------|----:|---------:|-----:|-----------:|
+| Alamo   |   4 |        1 |   41 |     112.6s |
 | Dam     |   3 |        2 |  115 |     117.3s |
 | Roxwood |   4 |        1 |   40 |     140.9s |
 
@@ -26,7 +33,8 @@
 
 | Zone    | Finished            | Electronics | Duration | s/electronic |
 |---------|---------------------|------------:|---------:|-------------:|
+| Alamo   | 06 Apr 2026 04:15AM |          99 |  76m 55s |        46.6s |
 | Dam     | 05 Apr 2026 03:51PM |          44 |  32m 49s |        44.8s |
 | Roxwood | 06 Apr 2026 12:58AM |         111 |  93m 57s |        50.8s |
 
-**Global average:** 49.1s/electronic (155 electronics in 126m 46s)
+**Global average:** 48.1s/electronic (254 electronics in 203m 41s)

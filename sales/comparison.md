@@ -2,15 +2,15 @@
 
 Detected tier: 3 (Alamo Sea, Dam, Roxwood).
 
-Bite wait by location: Alamo Sea 90s, Dam 90s, Roxwood 100s. Reel-in by location: Alamo Sea 15s, Dam 25s, Roxwood 40s.
+Bite wait by location: Alamo Sea 90s, Dam 90s, Roxwood 100s. Reel-in by location: Alamo Sea 23s, Dam 27s, Roxwood 41s.
 
 ~ = estimated (not yet observed in catch data)
 
 | Location  | Fish Caught | $/Fish observed | $/Fish model | Available Bundles                                     | $/Fish (bundles) | $/Fish total (obs) | $/Fish total (model) | $/Hour (model) |
 |-----------|------------:|----------------:|-------------:|-------------------------------------------------------|-----------------:|-------------------:|---------------------:|---------------:|
-| Alamo Sea |         420 |          $1,472 |       $1,404 | Gold Multizone #1, Alamo Starter, Low Level Multizone |             $655 |             $2,127 |           **$2,059** |        $70,606 |
-| Dam       |         335 |          $1,664 |       $1,664 | Gold Multizone #1, Low Level Multizone                |             $369 |             $2,033 |           **$2,033** |        $63,644 |
-| Roxwood   |         256 |          $1,826 |       $1,849 | Gold Multizone #1, Low Level Multizone                |             $257 |             $2,083 |           **$2,107** |        $54,168 |
+| Alamo Sea |         420 |          $1,472 |       $1,404 | Gold Multizone #1, Alamo Starter, Low Level Multizone |             $655 |             $2,127 |           **$2,059** |        $65,607 |
+| Dam       |         335 |          $1,664 |       $1,664 | Gold Multizone #1, Low Level Multizone                |             $369 |             $2,033 |           **$2,033** |        $62,556 |
+| Roxwood   |         256 |          $1,826 |       $1,849 | Gold Multizone #1, Low Level Multizone                |             $257 |             $2,083 |           **$2,107** |        $53,784 |
 
 ## Optimal Allocation
 
@@ -18,13 +18,13 @@ Optimal time split across locations to maximize total $/hour (considering both s
 
 | Location     | Time % (obs) | $/Fish (obs) | $/Hour (obs) | Time % (model) | $/Fish (model) | $/Hour (model) |
 |--------------|-------------:|-------------:|-------------:|---------------:|---------------:|---------------:|
-| Alamo Sea    |          57% |       $1,472 |      $57,829 |            57% |         $1,404 |        $55,497 |
-| Dam          |          20% |       $1,664 |      $52,096 |            20% |         $1,664 |        $52,096 |
-| Roxwood      |          23% |       $1,826 |      $46,954 |            23% |         $1,849 |        $47,555 |
-| **Combined** |         100% |              |  **$58,744** |           100% |                |    **$57,553** |
+| Alamo Sea    |          59% |       $1,472 |      $53,735 |            15% |         $1,404 |        $51,568 |
+| Dam          |          19% |       $1,664 |      $51,206 |            39% |         $1,664 |        $51,206 |
+| Roxwood      |          22% |       $1,826 |      $46,621 |            46% |         $1,849 |        $47,218 |
+| **Combined** |         100% |              |  **$56,022** |           100% |                |    **$55,377** |
 
-**Observed:** splitting yields **$58,744**/hour vs **$57,829**/hour best solo (+$915/hour, +1.6%).
-**Model:** splitting yields **$57,553**/hour vs **$55,497**/hour best solo (+$2,056/hour, +3.7%).
+**Observed:** splitting yields **$56,022**/hour vs **$53,735**/hour best solo (+$2,288/hour, +4.3%).
+**Model:** splitting yields **$55,377**/hour vs **$51,568**/hour best solo (+$3,809/hour, +7.4%).
 
 ## Bundle Details
 
@@ -32,14 +32,14 @@ Optimal time split across locations to maximize total $/hour (considering both s
 
 | Bundle        | Fish                                     |   Bonus | Avg Fish to Complete | Avg Time | Bonus/Fish | Catch Rates                                                                              |
 |---------------|------------------------------------------|--------:|---------------------:|---------:|-----------:|------------------------------------------------------------------------------------------|
-| Alamo Starter | Morwhong, Southern Tuna, Silver Trevally | $10,000 |                   57 |  101 min |       $174 | Morwhong: 27/420 (6.4%) \| Southern Tuna: 9/420 (2.1%) \| Silver Trevally: 17/420 (4.0%) |
+| Alamo Starter | Morwhong, Southern Tuna, Silver Trevally | $10,000 |                   57 |  108 min |       $174 | Morwhong: 27/420 (6.4%) \| Southern Tuna: 9/420 (2.1%) \| Silver Trevally: 17/420 (4.0%) |
 
 ### Cross-Location
 
 | Bundle              | Fish                             |   Bonus | Avg Fish to Complete | Avg Time | Bonus/Fish | Catch Rates                                                                                                 |
 |---------------------|----------------------------------|--------:|---------------------:|---------:|-----------:|-------------------------------------------------------------------------------------------------------------|
-| Gold Multizone #1   | Bluefin Tuna, Musky, Dolphinfish | $12,750 |                  202 |  382 min |        $63 | Bluefin Tuna @ Alamo Sea: 3/420 (0.7%) \| Musky @ Dam: 17/335 (5.1%) \| Dolphinfish @ Roxwood: 6/256 (2.3%) |
-| Low Level Multizone | Scollop, Carp, Grenadier         | $11,000 |                   56 |  116 min |       $196 | Scollop @ Alamo Sea: 47/420 (11.2%) \| Carp @ Dam: 14/335 (4.2%) \| Grenadier @ Roxwood: 11/256 (4.3%)      |
+| Gold Multizone #1   | Bluefin Tuna, Musky, Dolphinfish | $12,750 |                  202 |  402 min |        $63 | Bluefin Tuna @ Alamo Sea: 3/420 (0.7%) \| Musky @ Dam: 17/335 (5.1%) \| Dolphinfish @ Roxwood: 6/256 (2.3%) |
+| Low Level Multizone | Scollop, Carp, Grenadier         | $11,000 |                   56 |  118 min |       $196 | Scollop @ Alamo Sea: 47/420 (11.2%) \| Carp @ Dam: 14/335 (4.2%) \| Grenadier @ Roxwood: 11/256 (4.3%)      |
 
 ## Drop Rate Analysis
 

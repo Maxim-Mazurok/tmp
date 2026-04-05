@@ -1,3 +1,13 @@
+# Alamo
+
+Rod Level: 4
+Start: 6 Apr 2026 @ 2:58:14am
+Finish: 6 Apr 2026 @ 4:15:09am
+Fish before: 0
+Electronics before: 0
+Fish after: 41
+Electronics after: 99
+
 # Dam
 
 Rod Level: 3

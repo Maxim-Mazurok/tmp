@@ -161,9 +161,9 @@ SECONDS_WAITING_FOR_BITE: dict[str, int] = {
 }
 SECONDS_WAITING_FOR_BITE_DEFAULT = 100  # for unknown locations
 SECONDS_REELING_IN: dict[str, int] = {
-    "Alamo Sea": 15,
-    "Dam": 115 - SECONDS_WAITING_FOR_BITE["Dam"],
-    "Roxwood": 140 - SECONDS_WAITING_FOR_BITE["Roxwood"],
+    "Alamo Sea": 113 - SECONDS_WAITING_FOR_BITE["Alamo Sea"],
+    "Dam": 117 - SECONDS_WAITING_FOR_BITE["Dam"],
+    "Roxwood": 141 - SECONDS_WAITING_FOR_BITE["Roxwood"],
 }
 SECONDS_REELING_IN_DEFAULT = 30  # for unknown locations
 
