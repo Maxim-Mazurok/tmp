@@ -22,8 +22,8 @@ class Session:
     finish: datetime
     fish_before: int
     fish_after: int
-    electronics_before: int
-    electronics_after: int
+    electronics_before: int | None = None
+    electronics_after: int | None = None
 
     @property
     def duration_seconds(self) -> float:
@@ -35,6 +35,8 @@ class Session:
 
     @property
     def electronics_gained(self) -> int:
+        if self.electronics_before is None or self.electronics_after is None:
+            return 0
         return self.electronics_after - self.electronics_before
 
     @property
@@ -55,56 +57,67 @@ def parse_time_log(path: Path) -> list[Session]:
     text = path.read_text(encoding="utf-8")
     sessions: list[Session] = []
     current_zone = ""
+    pending: dict[str, object] = {}
+
+    def flush() -> None:
+        if "fish_after" in pending:
+            sessions.append(Session(
+                zone=current_zone,
+                rod_level=pending["rod_level"],  # type: ignore[arg-type]
+                start=pending["start"],  # type: ignore[arg-type]
+                finish=pending["finish"],  # type: ignore[arg-type]
+                fish_before=pending["fish_before"],  # type: ignore[arg-type]
+                fish_after=pending["fish_after"],  # type: ignore[arg-type]
+                electronics_before=pending.get("electronics_before"),  # type: ignore[arg-type]
+                electronics_after=pending.get("electronics_after"),  # type: ignore[arg-type]
+            ))
 
     for line in text.splitlines():
         line = line.strip()
 
         zone_match = re.match(r"^#\s+(.+)$", line)
         if zone_match:
+            flush()
+            pending = {}
             current_zone = zone_match.group(1).strip()
             continue
 
         if line == "---":
+            flush()
+            pending = {}
             continue
 
         if line.startswith("Rod Level:"):
-            rod_level = int(line.split(":")[1].strip())
+            flush()
+            pending = {}
+            pending["rod_level"] = int(line.split(":")[1].strip())
             continue
 
         if line.startswith("Start:"):
-            start = datetime.strptime(line.split(":", 1)[1].strip(), DATE_FORMAT)
+            pending["start"] = datetime.strptime(line.split(":", 1)[1].strip(), DATE_FORMAT)
             continue
 
         if line.startswith("Finish:"):
-            finish = datetime.strptime(line.split(":", 1)[1].strip(), DATE_FORMAT)
+            pending["finish"] = datetime.strptime(line.split(":", 1)[1].strip(), DATE_FORMAT)
             continue
 
         if line.startswith("Fish before:"):
-            fish_before = int(line.split(":")[1].strip())
+            pending["fish_before"] = int(line.split(":")[1].strip())
             continue
 
         if line.startswith("Electronics before:"):
-            electronics_before = int(line.split(":")[1].strip())
+            pending["electronics_before"] = int(line.split(":")[1].strip())
             continue
 
         if line.startswith("Fish after:"):
-            fish_after = int(line.split(":")[1].strip())
+            pending["fish_after"] = int(line.split(":")[1].strip())
             continue
 
         if line.startswith("Electronics after:"):
-            electronics_after = int(line.split(":")[1].strip())
-            sessions.append(Session(
-                zone=current_zone,
-                rod_level=rod_level,
-                start=start,
-                finish=finish,
-                fish_before=fish_before,
-                fish_after=fish_after,
-                electronics_before=electronics_before,
-                electronics_after=electronics_after,
-            ))
+            pending["electronics_after"] = int(line.split(":")[1].strip())
             continue
 
+    flush()
     return sessions
 
 
@@ -162,6 +175,7 @@ def build_zone_average_section(
 
 def build_electronics_section(sessions: list[Session]) -> str:
     """Build global electronics log and average."""
+    sessions = [s for s in sessions if s.electronics_before is not None]
     log_rows: list[tuple[str, ...]] = []
     for session in sessions:
         electronics_gained = session.electronics_gained
@@ -221,7 +235,9 @@ def build_time_md(sessions: list[Session]) -> str:
     sections.append(average_table)
 
     # Electronics (global)
-    sections.append(build_electronics_section(sessions))
+    electronics_sessions = [s for s in sessions if s.electronics_before is not None]
+    if electronics_sessions:
+        sections.append(build_electronics_section(sessions))
 
     return "\n\n".join(sections) + "\n"
 

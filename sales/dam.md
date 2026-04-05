@@ -4,21 +4,21 @@
 
 | Fish             |   Count |        % | Stars | Bundles             |
 |------------------|--------:|---------:|-------|---------------------|
-| Musky            |      11 |     5.4% | ★★★   | Gold Multizone #1   |
-| Pike             |       8 |     3.9% | ★★★   |                     |
-| Rainbow Trout    |       4 |     2.0% | ★★★   |                     |
-| Atlantic Salmon  |      12 |     5.9% | ★★    |                     |
-| Trevella         |      10 |     4.9% | ★★    | Silver Multizone #2 |
-| Wahoo            |       9 |     4.4% | ★★    |                     |
-| Sturgeon         |       9 |     4.4% | ★★    |                     |
-| Carp             |       9 |     4.4% | ★★    | Low Level Multizone |
-| Trumpetfish      |       7 |     3.4% | ★★    |                     |
-| Murray Cod       |      32 |    15.8% | ★     |                     |
-| Banded Butterfly |      21 |    10.3% | ★     |                     |
-| Sand Whiting     |      19 |     9.4% | ★     |                     |
-| Triggerfish      |      14 |     6.9% | ★     |                     |
-| Cod              |      11 |     5.4% | ★     |                     |
-| Black Bream      |      10 |     4.9% | ★     |                     |
-| Escolar          |      10 |     4.9% | ★     |                     |
-| Brook Trout      |       7 |     3.4% | ★     | Bronze Multizone #2 |
-| **Total**        | **203** | **100%** |       |                     |
+| Musky            |      17 |     5.1% | ★★★   | Gold Multizone #1   |
+| Pike             |      10 |     3.0% | ★★★   |                     |
+| Rainbow Trout    |       7 |     2.1% | ★★★   |                     |
+| Atlantic Salmon  |      23 |     6.9% | ★★    |                     |
+| Trevella         |      19 |     5.7% | ★★    | Silver Multizone #2 |
+| Trumpetfish      |      16 |     4.8% | ★★    |                     |
+| Carp             |      14 |     4.2% | ★★    | Low Level Multizone |
+| Wahoo            |      12 |     3.6% | ★★    |                     |
+| Sturgeon         |      10 |     3.0% | ★★    |                     |
+| Murray Cod       |      50 |    14.9% | ★     |                     |
+| Banded Butterfly |      35 |    10.4% | ★     |                     |
+| Triggerfish      |      28 |     8.4% | ★     |                     |
+| Sand Whiting     |      26 |     7.8% | ★     |                     |
+| Cod              |      23 |     6.9% | ★     |                     |
+| Escolar          |      19 |     5.7% | ★     |                     |
+| Brook Trout      |      16 |     4.8% | ★     | Bronze Multizone #2 |
+| Black Bream      |      10 |     3.0% | ★     |                     |
+| **Total**        | **335** | **100%** |       |                     |

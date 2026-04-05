@@ -52,3 +52,19 @@ Black Bream	3
 Trevella	4
 Trumpetfish	2
 --sold
+Brook Trout	9
+Escolar	9
+Trevella	9
+Atlantic Salmon	11
+Triggerfish	14
+Cod	12
+Carp	5
+Sturgeon	1
+Banded Butterfly	14
+Murray Cod	18
+Trumpetfish	9
+Rainbow Trout	3
+Wahoo	3
+Sand Whiting	7
+Musky	6
+Pike	2

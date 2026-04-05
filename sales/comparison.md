@@ -9,7 +9,7 @@ Bite wait by location: Alamo Sea 80s, Dam 90s, Roxwood 100s. Reel-in by location
 | Location  | Fish Caught | $/Fish observed | $/Fish model | Available Bundles                                     | $/Fish (bundles) | $/Fish total (obs) | $/Fish total (model) | $/Hour (model) |
 |-----------|------------:|----------------:|-------------:|-------------------------------------------------------|-----------------:|-------------------:|---------------------:|---------------:|
 | Alamo Sea |         420 |          $1,472 |       $1,404 | Gold Multizone #1, Alamo Starter, Low Level Multizone |             $655 |             $2,127 |           **$2,059** |        $78,038 |
-| Dam       |         203 |          $1,670 |       $1,670 | Gold Multizone #1, Low Level Multizone                |             $393 |             $2,063 |           **$2,063** |        $64,583 |
+| Dam       |         335 |          $1,664 |       $1,664 | Gold Multizone #1, Low Level Multizone                |             $369 |             $2,033 |           **$2,033** |        $63,644 |
 | Roxwood   |         172 |          $1,804 |       $1,871 | Gold Multizone #1, Low Level Multizone                |             $205 |             $2,009 |           **$2,077** |        $57,504 |
 
 ## Optimal Allocation
@@ -18,13 +18,13 @@ Optimal time split across locations to maximize total $/hour (considering both s
 
 | Location     | Time % (obs) | $/Fish (obs) | $/Hour (obs) | Time % (model) | $/Fish (model) | $/Hour (model) |
 |--------------|-------------:|-------------:|-------------:|---------------:|---------------:|---------------:|
-| Alamo Sea    |         100% |       $1,472 |      $63,916 |            62% |         $1,404 |        $61,339 |
-| Dam          |           0% |       $1,670 |      $52,284 |            14% |         $1,670 |        $52,284 |
-| Roxwood      |           0% |       $1,804 |      $49,959 |            24% |         $1,871 |        $51,816 |
-| **Combined** |         100% |              |  **$63,916** |           100% |                |    **$61,881** |
+| Alamo Sea    |         100% |       $1,472 |      $63,916 |            60% |         $1,404 |        $61,339 |
+| Dam          |           0% |       $1,664 |      $52,096 |            15% |         $1,664 |        $52,096 |
+| Roxwood      |           0% |       $1,804 |      $49,959 |            25% |         $1,871 |        $51,816 |
+| **Combined** |         100% |              |  **$63,916** |           100% |                |    **$61,783** |
 
 **Observed:** splitting yields **$63,916**/hour vs **$63,916**/hour best solo (+$0/hour, +0.0%).
-**Model:** splitting yields **$61,881**/hour vs **$61,339**/hour best solo (+$543/hour, +0.9%).
+**Model:** splitting yields **$61,783**/hour vs **$61,339**/hour best solo (+$444/hour, +0.7%).
 
 ## Bundle Details
 
@@ -38,8 +38,8 @@ Optimal time split across locations to maximize total $/hour (considering both s
 
 | Bundle              | Fish                             |   Bonus | Avg Fish to Complete | Avg Time | Bonus/Fish | Catch Rates                                                                                                 |
 |---------------------|----------------------------------|--------:|---------------------:|---------:|-----------:|-------------------------------------------------------------------------------------------------------------|
-| Gold Multizone #1   | Bluefin Tuna, Musky, Dolphinfish | $12,750 |                  201 |  350 min |        $63 | Bluefin Tuna @ Alamo Sea: 3/420 (0.7%) \| Musky @ Dam: 11/203 (5.4%) \| Dolphinfish @ Roxwood: 4/172 (2.3%) |
-| Low Level Multizone | Scollop, Carp, Grenadier         | $11,000 |                   66 |  132 min |       $167 | Scollop @ Alamo Sea: 47/420 (11.2%) \| Carp @ Dam: 9/203 (4.4%) \| Grenadier @ Roxwood: 5/172 (2.9%)        |
+| Gold Multizone #1   | Bluefin Tuna, Musky, Dolphinfish | $12,750 |                  203 |  353 min |        $63 | Bluefin Tuna @ Alamo Sea: 3/420 (0.7%) \| Musky @ Dam: 17/335 (5.1%) \| Dolphinfish @ Roxwood: 4/172 (2.3%) |
+| Low Level Multizone | Scollop, Carp, Grenadier         | $11,000 |                   67 |  135 min |       $164 | Scollop @ Alamo Sea: 47/420 (11.2%) \| Carp @ Dam: 14/335 (4.2%) \| Grenadier @ Roxwood: 5/172 (2.9%)       |
 
 ## Drop Rate Analysis
 
@@ -50,9 +50,9 @@ Tier drop rates are consistent across locations, suggesting a fixed game mechani
 | Tier        | Alamo Sea |   Dam | Roxwood | Average |
 |-------------|----------:|------:|--------:|--------:|
 | ★★★★ purple |      0.2% |  0.0% |    0.0% |    0.1% |
-| ★★★         |      6.4% | 11.3% |    8.7% |    8.8% |
-| ★★          |     26.4% | 27.6% |   32.6% |   28.9% |
-| ★           |     65.5% | 61.1% |   58.7% |   61.8% |
+| ★★★         |      6.4% | 10.1% |    8.7% |    8.4% |
+| ★★          |     26.4% | 28.1% |   32.6% |   29.0% |
+| ★           |     65.5% | 61.8% |   58.7% |   62.0% |
 
 ### Within-Tier Weights
 
@@ -99,46 +99,46 @@ Model fit (25%/20%/20%/15%/10%/10%): χ² = 2.38, p = 0.795 — excellent
 Weight fit: χ² = 0.36, df = 6, p = 0.999 — excellent
 Model fit (20%/15%/15%/15%/10%/10%/10%/5%): χ² = 1.36, p = 0.968 — excellent
 
-#### Dam — ★★★ (3 fish, 23 observed)
+#### Dam — ★★★ (3 fish, 34 observed)
 
 | Fish          | Count | Observed % | Weight | Weight % | Model % | Model % (norm) | Residual |
 |---------------|------:|-----------:|-------:|---------:|--------:|---------------:|---------:|
-| Musky         |    11 |      47.8% |      7 |    41.2% |     55% |          55.0% |     -1.7 |
-| Pike          |     8 |      34.8% |      7 |    41.2% |     30% |          30.0% |     +1.1 |
-| Rainbow Trout |     4 |      17.4% |      3 |    17.6% |     15% |          15.0% |     +0.5 |
+| Musky         |    17 |      50.0% |      2 |    50.0% |     55% |          55.0% |     -1.7 |
+| Pike          |    10 |      29.4% |      1 |    25.0% |     30% |          30.0% |     -0.2 |
+| Rainbow Trout |     7 |      20.6% |      1 |    25.0% |     15% |          15.0% |     +1.9 |
 
-Weight fit: χ² = 0.48, df = 2, p = 0.788 — excellent
-Model fit (55%/30%/15%): χ² = 0.48, p = 0.787 — excellent
+Weight fit: χ² = 0.53, df = 2, p = 0.767 — excellent
+Model fit (55%/30%/15%): χ² = 0.87, p = 0.648 — excellent
 
-#### Dam — ★★ (6 fish, 56 observed)
+#### Dam — ★★ (6 fish, 94 observed)
 
 | Fish            | Count | Observed % | Weight | Weight % | Model % | Model % (norm) | Residual |
 |-----------------|------:|-----------:|-------:|---------:|--------:|---------------:|---------:|
-| Atlantic Salmon |    12 |      21.4% |      1 |    16.7% |     25% |          25.0% |     -2.0 |
-| Trevella        |    10 |      17.9% |      1 |    16.7% |     20% |          20.0% |     -1.2 |
-| Wahoo           |     9 |      16.1% |      1 |    16.7% |     20% |          20.0% |     -2.2 |
-| Sturgeon        |     9 |      16.1% |      1 |    16.7% |     15% |          15.0% |     +0.6 |
-| Carp            |     9 |      16.1% |      1 |    16.7% |     10% |          10.0% |     +3.4 |
-| Trumpetfish     |     7 |      12.5% |      1 |    16.7% |     10% |          10.0% |     +1.4 |
+| Atlantic Salmon |    23 |      24.5% |      8 |    22.2% |     25% |          25.0% |     -0.5 |
+| Trevella        |    19 |      20.2% |      8 |    22.2% |     20% |          20.0% |     +0.2 |
+| Trumpetfish     |    16 |      17.0% |      5 |    13.9% |     20% |          20.0% |     -2.8 |
+| Carp            |    14 |      14.9% |      5 |    13.9% |     15% |          15.0% |     -0.1 |
+| Wahoo           |    12 |      12.8% |      5 |    13.9% |     10% |          10.0% |     +2.6 |
+| Sturgeon        |    10 |      10.6% |      5 |    13.9% |     10% |          10.0% |     +0.6 |
 
-Weight fit: χ² = 1.43, df = 5, p = 0.921 — excellent
-Model fit (25%/20%/20%/15%/10%/10%): χ² = 3.30, p = 0.653 — excellent
+Weight fit: χ² = 1.92, df = 5, p = 0.861 — excellent
+Model fit (25%/20%/20%/15%/10%/10%): χ² = 1.19, p = 0.946 — excellent
 
-#### Dam — ★ (8 fish, 124 observed)
+#### Dam — ★ (8 fish, 207 observed)
 
 | Fish             | Count | Observed % | Weight | Weight % | Model % | Model % (norm) | Residual |
 |------------------|------:|-----------:|-------:|---------:|--------:|---------------:|---------:|
-| Murray Cod       |    32 |      25.8% |      7 |    25.9% |     20% |          20.0% |     +7.2 |
-| Banded Butterfly |    21 |      16.9% |      4 |    14.8% |     15% |          15.0% |     +2.4 |
-| Sand Whiting     |    19 |      15.3% |      4 |    14.8% |     15% |          15.0% |     +0.4 |
-| Triggerfish      |    14 |      11.3% |      4 |    14.8% |     15% |          15.0% |     -4.6 |
-| Cod              |    11 |       8.9% |      2 |     7.4% |     10% |          10.0% |     -1.4 |
-| Black Bream      |    10 |       8.1% |      2 |     7.4% |     10% |          10.0% |     -2.4 |
-| Escolar          |    10 |       8.1% |      2 |     7.4% |     10% |          10.0% |     -2.4 |
-| Brook Trout      |     7 |       5.6% |      2 |     7.4% |      5% |           5.0% |     +0.8 |
+| Murray Cod       |    50 |      24.2% |      5 |    23.8% |     20% |          20.0% |     +8.6 |
+| Banded Butterfly |    35 |      16.9% |      3 |    14.3% |     15% |          15.0% |     +3.9 |
+| Triggerfish      |    28 |      13.5% |      3 |    14.3% |     15% |          15.0% |     -3.1 |
+| Sand Whiting     |    26 |      12.6% |      3 |    14.3% |     15% |          15.0% |     -5.1 |
+| Cod              |    23 |      11.1% |      2 |     9.5% |     10% |          10.0% |     +2.3 |
+| Escolar          |    19 |       9.2% |      2 |     9.5% |     10% |          10.0% |     -1.7 |
+| Brook Trout      |    16 |       7.7% |      2 |     9.5% |     10% |          10.0% |     -4.7 |
+| Black Bream      |    10 |       4.8% |      1 |     4.8% |      5% |           5.0% |     -0.3 |
 
-Weight fit: χ² = 2.46, df = 7, p = 0.930 — excellent
-Model fit (20%/15%/15%/15%/10%/10%/10%/5%): χ² = 4.74, p = 0.692 — excellent
+Weight fit: χ² = 2.80, df = 7, p = 0.903 — excellent
+Model fit (20%/15%/15%/15%/10%/10%/10%/5%): χ² = 4.88, p = 0.674 — excellent
 
 #### Roxwood — ★★★ (3 fish, 15 observed)
 

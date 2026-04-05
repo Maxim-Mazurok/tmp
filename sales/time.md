@@ -7,12 +7,13 @@
 | Finished            | Rod | Fish | Duration | s/fish |
 |---------------------|----:|-----:|---------:|-------:|
 | 05 Apr 2026 03:51PM |   3 |   17 |  32m 49s | 115.8s |
+| 05 Apr 2026 07:18PM |   3 |   98 | 191m 55s | 117.5s |
 
 ## Average s/fish by Zone and Rod Level
 
 | Zone | Rod | Sessions | Fish | Avg s/fish |
 |------|----:|---------:|-----:|-----------:|
-| Dam  |   3 |        1 |   17 |     115.8s |
+| Dam  |   3 |        2 |  115 |     117.3s |
 
 ## Electronics
 
