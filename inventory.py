@@ -10,6 +10,9 @@ import time
 import cv2
 import numpy as np
 import pytesseract
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Point pytesseract at the installed Tesseract binary
 pytesseract.pytesseract.tesseract_cmd = (

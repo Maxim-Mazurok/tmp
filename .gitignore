@@ -2,6 +2,7 @@
 __pycache__/
 .pytest_cache/
 .benchmarks/
+.env
 
 # Recorded videos and extracted frames
 *.mp4

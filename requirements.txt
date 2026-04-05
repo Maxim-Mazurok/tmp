@@ -4,5 +4,6 @@ opencv-python
 mss
 pydirectinput
 pytesseract
+python-dotenv
 scipy
 pytest==9.0.2
