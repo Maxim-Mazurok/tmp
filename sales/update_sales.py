@@ -12,6 +12,7 @@ from constants import (
     REGIONS,
     SALES_DIR,
     SECONDS_REELING_IN,
+    SECONDS_REELING_IN_DEFAULT,
     SECONDS_WAITING_FOR_BITE,
     SPECIAL_FISH_NOTES,
     TIER_DROP_PERCENTAGES,
@@ -258,12 +259,27 @@ def _compute_bundle_contributions(
     return contributions
 
 
+def _compute_observed_sale_values(
+    region_data: dict[str, Counter],
+) -> dict[str, float]:
+    """Compute observed $/fish (sales) for each location."""
+    sale_values: dict[str, float] = {}
+    for location, counts in region_data.items():
+        total_fish = sum(counts.values())
+        total_value = sum(
+            counts[name] * PRICES[name][0]
+            for name in counts
+            if name in PRICES
+        )
+        sale_values[location] = total_value / total_fish
+    return sale_values
+
+
 def _compute_model_sale_value(region_name: str, counts: Counter) -> float:
-    """Compute model-based $/fish (sales) using percentage templates.
+    """Compute model-based $/fish (sales) for a single location.
 
     For each fish, uses the model probability instead of observed frequency.
     """
-    total_fish = sum(counts.values())
     model_value = 0.0
 
     for fish_name in counts:
@@ -275,6 +291,58 @@ def _compute_model_sale_value(region_name: str, counts: Counter) -> float:
             model_value += probability * price
 
     return model_value
+
+
+def _compute_model_sale_values(
+    region_data: dict[str, Counter],
+) -> dict[str, float]:
+    """Compute model-based $/fish (sales) for each location."""
+    return {
+        location: _compute_model_sale_value(location, counts)
+        for location, counts in region_data.items()
+    }
+
+
+def _grid_search_optimal(
+    locations: list[str],
+    sale_values: dict[str, float],
+    bundles: list[tuple[str, int, list[BundleFishAssignment]]],
+    granularity: int = 100,
+) -> tuple[float, dict[str, float]]:
+    """Grid-search for the optimal allocation fractions.
+
+    Returns (best_revenue, best_fractions).
+    """
+    best_revenue = -1.0
+    best_fractions: dict[str, float] = {}
+
+    if len(locations) == 2:
+        for step_a in range(granularity + 1):
+            fraction_a = step_a / granularity
+            fraction_b = 1.0 - fraction_a
+            fractions = {locations[0]: fraction_a, locations[1]: fraction_b}
+            revenue = _compute_revenue(fractions, sale_values, bundles)
+            if revenue > best_revenue:
+                best_revenue = revenue
+                best_fractions = fractions.copy()
+    elif len(locations) == 3:
+        for step_a in range(granularity + 1):
+            fraction_a = step_a / granularity
+            remaining = granularity - step_a
+            for step_b in range(remaining + 1):
+                fraction_b = step_b / granularity
+                fraction_c = 1.0 - fraction_a - fraction_b
+                fractions = {
+                    locations[0]: fraction_a,
+                    locations[1]: fraction_b,
+                    locations[2]: fraction_c,
+                }
+                revenue = _compute_revenue(fractions, sale_values, bundles)
+                if revenue > best_revenue:
+                    best_revenue = revenue
+                    best_fractions = fractions.copy()
+
+    return best_revenue, best_fractions
 
 
 def build_comparison_table() -> str:
@@ -293,6 +361,8 @@ def build_comparison_table() -> str:
         return ""
 
     bundle_contributions = _compute_bundle_contributions(region_data)
+    observed_sale_values = _compute_observed_sale_values(region_data)
+    model_sale_values = _compute_model_sale_values(region_data)
 
     rows = []
     for region_key, region_name in REGIONS.items():
@@ -302,13 +372,8 @@ def build_comparison_table() -> str:
         counts = region_data[region_name]
         total_fish = sum(counts.values())
 
-        total_sale_value = sum(
-            counts[name] * PRICES[name][0]
-            for name in counts
-            if name in PRICES
-        )
-        observed_sale_per_fish = total_sale_value / total_fish
-        model_sale_per_fish = _compute_model_sale_value(region_name, counts)
+        observed_sale_per_fish = observed_sale_values[region_name]
+        model_sale_per_fish = model_sale_values[region_name]
 
         location_bundles = bundle_contributions.get(region_name, [])
         bundle_value_per_fish = sum(bonus for _, bonus, _ in location_bundles)
@@ -491,17 +556,8 @@ def build_optimal_allocation(region_data: dict[str, Counter]) -> str:
     if len(locations) < 2:
         return ""
 
-    sale_values: dict[str, float] = {}
-    model_sale_values: dict[str, float] = {}
-    for location, counts in region_data.items():
-        total_fish = sum(counts.values())
-        total_value = sum(
-            counts[name] * PRICES[name][0]
-            for name in counts
-            if name in PRICES
-        )
-        sale_values[location] = total_value / total_fish
-        model_sale_values[location] = _compute_model_sale_value(location, counts)
+    sale_values = _compute_observed_sale_values(region_data)
+    model_sale_values = _compute_model_sale_values(region_data)
 
     bundles = _resolve_available_bundles(region_data)
 
@@ -519,35 +575,10 @@ def build_optimal_allocation(region_data: dict[str, Counter]) -> str:
 
     # Grid search with 1% granularity
     granularity = 100
-    best_revenue = -1.0
-    best_fractions: dict[str, float] = {}
-
-    if len(locations) == 2:
-        for step_a in range(granularity + 1):
-            fraction_a = step_a / granularity
-            fraction_b = 1.0 - fraction_a
-            fractions = {locations[0]: fraction_a, locations[1]: fraction_b}
-            revenue = _compute_revenue(fractions, sale_values, bundles)
-            if revenue > best_revenue:
-                best_revenue = revenue
-                best_fractions = fractions.copy()
-    elif len(locations) == 3:
-        for step_a in range(granularity + 1):
-            fraction_a = step_a / granularity
-            remaining = granularity - step_a
-            for step_b in range(remaining + 1):
-                fraction_b = step_b / granularity
-                fraction_c = 1.0 - fraction_a - fraction_b
-                fractions = {
-                    locations[0]: fraction_a,
-                    locations[1]: fraction_b,
-                    locations[2]: fraction_c,
-                }
-                revenue = _compute_revenue(fractions, sale_values, bundles)
-                if revenue > best_revenue:
-                    best_revenue = revenue
-                    best_fractions = fractions.copy()
-    else:
+    best_revenue, best_fractions = _grid_search_optimal(
+        locations, sale_values, bundles, granularity,
+    )
+    if not best_fractions:
         return ""
 
     baseline_revenues: dict[str, float] = {}
@@ -562,34 +593,9 @@ def build_optimal_allocation(region_data: dict[str, Counter]) -> str:
         )
 
     # Optimize using model sale values
-    model_best_revenue = -1.0
-    model_best_fractions: dict[str, float] = {}
-
-    if len(locations) == 2:
-        for step_a in range(granularity + 1):
-            fraction_a = step_a / granularity
-            fraction_b = 1.0 - fraction_a
-            fractions = {locations[0]: fraction_a, locations[1]: fraction_b}
-            revenue = _compute_revenue(fractions, model_sale_values, bundles)
-            if revenue > model_best_revenue:
-                model_best_revenue = revenue
-                model_best_fractions = fractions.copy()
-    elif len(locations) == 3:
-        for step_a in range(granularity + 1):
-            fraction_a = step_a / granularity
-            remaining = granularity - step_a
-            for step_b in range(remaining + 1):
-                fraction_b = step_b / granularity
-                fraction_c = 1.0 - fraction_a - fraction_b
-                fractions = {
-                    locations[0]: fraction_a,
-                    locations[1]: fraction_b,
-                    locations[2]: fraction_c,
-                }
-                revenue = _compute_revenue(fractions, model_sale_values, bundles)
-                if revenue > model_best_revenue:
-                    model_best_revenue = revenue
-                    model_best_fractions = fractions.copy()
+    model_best_revenue, model_best_fractions = _grid_search_optimal(
+        locations, model_sale_values, bundles, granularity,
+    )
 
     lines = ["## Optimal Allocation"]
     if any_estimated:
@@ -1060,9 +1066,13 @@ def main() -> None:
             f"{loc} {SECONDS_WAITING_FOR_BITE[loc]}s"
             for loc in unlocked if loc in SECONDS_WAITING_FOR_BITE
         )
+        reel_details = ", ".join(
+            f"{loc} {SECONDS_REELING_IN.get(loc, SECONDS_REELING_IN_DEFAULT)}s"
+            for loc in unlocked
+        )
         time_note = (
             f"Bite wait by location: {bite_details}."
-            f" Reel-in: {SECONDS_REELING_IN}s."
+            f" Reel-in by location: {reel_details}."
         )
         estimated_note = "~ = estimated (not yet observed in catch data)"
         content = (

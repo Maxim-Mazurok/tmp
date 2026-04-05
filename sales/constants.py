@@ -7,7 +7,7 @@ SALES_DIR = Path(__file__).parent
 
 REGIONS = {
     "alamo": "Alamo Sea",
-    "dam": "Land Act Dam",
+    "dam": "Dam",
     "roxwood": "Roxwood",
     "ocean": "Ocean",
     "cave": "Cave",
@@ -141,7 +141,7 @@ PRICES: dict[str, tuple[int, int, str]] = {
 
 TIER_PRICES = {
     "Alamo Sea":    {1: 1350, 2: 1650, 3: 2000},
-    "Land Act Dam": {1: 1500, 2: 1850, 3: 2150},
+    "Dam": {1: 1500, 2: 1850, 3: 2150},
     "Roxwood":      {1: 1650, 2: 2000, 3: 2350},
     "Ocean":        {1: 1850, 2: 2150, 3: 2500},
     "Cave":         {1: 2000, 2: 2350, 3: 2650},
@@ -156,16 +156,23 @@ SPECIAL_FISH_NOTES: dict[str, str] = {
 # Time per fish (seconds) – bite wait varies by location
 SECONDS_WAITING_FOR_BITE: dict[str, int] = {
     "Alamo Sea": 80,
-    "Land Act Dam": 90,
+    "Dam": 90,
     "Roxwood": 100,
 }
 SECONDS_WAITING_FOR_BITE_DEFAULT = 100  # for unknown locations
-SECONDS_REELING_IN = 15                 # improves with skill
+SECONDS_REELING_IN: dict[str, int] = {
+    "Alamo Sea": 15,
+    "Dam": 115 - SECONDS_WAITING_FOR_BITE["Dam"],
+    "Roxwood": 30,
+}
+SECONDS_REELING_IN_DEFAULT = 30  # for unknown locations
 
 
 def seconds_per_fish(location: str) -> int:
     """Total seconds per fish at a given location."""
-    return SECONDS_WAITING_FOR_BITE.get(location, SECONDS_WAITING_FOR_BITE_DEFAULT) + SECONDS_REELING_IN
+    waiting = SECONDS_WAITING_FOR_BITE.get(location, SECONDS_WAITING_FOR_BITE_DEFAULT)
+    reeling = SECONDS_REELING_IN.get(location, SECONDS_REELING_IN_DEFAULT)
+    return waiting + reeling
 
 
 def fish_per_hour(location: str) -> float:

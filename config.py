@@ -33,5 +33,4 @@ BITE_WAIT = 120.0      # seconds to wait for bite before starting to look for mi
 MINIGAME_GRACE = 5.0   # seconds after minigame start before allowing catch detection
 CAST_WAIT_POLL = 2.0   # seconds between polls while waiting for bite
 BAR_APPEAR_DELAY = 5.0 # extra seconds after BITE_WAIT for bar to fully appear
-CONTROL_HZ = 60        # control loop frequency during minigame
 BAR_REDETECT_INTERVAL = 3.0  # seconds between bar position re-detection

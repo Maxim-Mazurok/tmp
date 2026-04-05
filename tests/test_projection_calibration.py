@@ -50,6 +50,7 @@ def test_summarize_projection_outcomes_returns_adjustment_hints():
     outcomes = [
         {
             'timing_error_frames': 1,
+            'target_seconds': 0.2,
             'fish_error': 0.03,
             'box_error': 0.02,
             'gap_error': 0.01,
@@ -63,6 +64,7 @@ def test_summarize_projection_outcomes_returns_adjustment_hints():
         },
         {
             'timing_error_frames': -1,
+            'target_seconds': 0.15,
             'fish_error': -0.01,
             'box_error': -0.03,
             'gap_error': -0.02,
@@ -81,11 +83,10 @@ def test_summarize_projection_outcomes_returns_adjustment_hints():
         current_lookahead=0.10,
         current_gravity=3.1,
         current_thrust=5.9,
-        control_hz=60,
     )
 
     assert summary['samples'] == 2
-    assert summary['timing']['mean_frames'] == 0.0
+    assert summary['timing']['mean_seconds'] > 0.0
     assert summary['errors']['mean_abs_box_error'] > 0.0
     assert summary['reward']['positive_samples'] == 1
     assert summary['reward']['effective_overlap_gap'] == pytest.approx(0.08)

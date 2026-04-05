@@ -18,8 +18,6 @@ import numpy as np
 from matplotlib.colors import LinearSegmentedColormap
 
 from constants import (
-    BUNDLES,
-    PRICES,
     REGIONS,
     SALES_DIR,
     fish_per_hour,
@@ -27,7 +25,9 @@ from constants import (
 from parsing import parse_log
 from update_sales import (
     BundleFishAssignment,
+    _compute_observed_sale_values,
     _compute_revenue,
+    _grid_search_optimal,
     _resolve_available_bundles,
 )
 
@@ -44,21 +44,6 @@ def _load_region_data() -> dict[str, Counter]:
             if counts:
                 region_data[region_name] = counts
     return region_data
-
-
-def _compute_sale_values(
-    region_data: dict[str, Counter],
-) -> dict[str, float]:
-    sale_values = {}
-    for location, counts in region_data.items():
-        total_fish = sum(counts.values())
-        total_value = sum(
-            counts[name] * PRICES[name][0]
-            for name in counts
-            if name in PRICES
-        )
-        sale_values[location] = total_value / total_fish
-    return sale_values
 
 
 # --- Ternary coordinate helpers ---
@@ -584,23 +569,9 @@ def _find_optimal_fractions(
     granularity: int = 100,
 ) -> dict[str, float]:
     """Grid-search for the optimal allocation fractions."""
-    best_revenue = -1.0
-    best_fractions: dict[str, float] = {}
-    for step_a in range(granularity + 1):
-        fraction_a = step_a / granularity
-        remaining = granularity - step_a
-        for step_b in range(remaining + 1):
-            fraction_b = step_b / granularity
-            fraction_c = 1.0 - fraction_a - fraction_b
-            fractions = {
-                locations[0]: fraction_a,
-                locations[1]: fraction_b,
-                locations[2]: fraction_c,
-            }
-            revenue = _compute_revenue(fractions, sale_values, bundles)
-            if revenue > best_revenue:
-                best_revenue = revenue
-                best_fractions = fractions.copy()
+    _revenue, best_fractions = _grid_search_optimal(
+        locations, sale_values, bundles, granularity,
+    )
     return best_fractions
 
 
@@ -653,6 +624,8 @@ def figure_5_min_envelope(
     sweep_location = locations[0]
     other_locations = locations[1:]
     other_ratios = [optimal.get(loc, 0.01) for loc in other_locations]
+    if sum(other_ratios) == 0:
+        other_ratios = [1.0 / len(other_locations)] * len(other_locations)
     sweep_values, fraction_list = _build_1d_sweep_path(
         sweep_location, other_locations, other_ratios, steps=500,
     )
@@ -806,6 +779,8 @@ def figure_6_objective_decomposition(
     sweep_location = locations[0]
     other_locations = locations[1:]
     other_ratios = [optimal.get(loc, 0.01) for loc in other_locations]
+    if sum(other_ratios) == 0:
+        other_ratios = [1.0 / len(other_locations)] * len(other_locations)
     sweep_values, fraction_list = _build_1d_sweep_path(
         sweep_location, other_locations, other_ratios, steps=500,
     )
@@ -1022,14 +997,14 @@ def figure_7_individual_components(
 def main() -> None:
     region_data = _load_region_data()
     locations = [
-        name for name in ["Alamo Sea", "Land Act Dam", "Roxwood"]
+        name for name in ["Alamo Sea", "Dam", "Roxwood"]
         if name in region_data
     ]
     if len(locations) < 3:
         print(f"Need 3 locations, found {len(locations)}")
         return
 
-    sale_values = _compute_sale_values(region_data)
+    sale_values = _compute_observed_sale_values(region_data)
     bundles = _resolve_available_bundles(region_data)
 
     print("Generating figures...")

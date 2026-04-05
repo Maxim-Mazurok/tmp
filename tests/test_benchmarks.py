@@ -176,12 +176,12 @@ class TestRealFrameBenchmarks:
 class TestPerformanceRequirements:
     """Tests that verify the system meets minimum performance requirements.
 
-    The game runs at 60 FPS, so the detection pipeline (find_bar + detect_elements)
-    must complete in under ~16ms per frame.
+    The detection pipeline (find_bar + detect_elements) must complete fast
+    enough to sustain high frame rates for responsive control.
     """
 
     def test_detection_under_16ms(self):
-        """Detection pipeline should complete in < 16ms (60 FPS requirement)."""
+        """Detection pipeline should complete in < 16ms."""
         import time
         img = load_frame(FRAME_DIR_1, '001001')
         if img is None:
@@ -202,7 +202,7 @@ class TestPerformanceRequirements:
         p95_ms = np.percentile(times, 95) * 1000
         # Note: full pipeline (find_bar + detect_elements) on a fresh detector
         # takes ~30ms. In practice, find_bar runs only once and detect_elements
-        # runs at ~0.2ms per frame. The 60 FPS budget is met in steady state.
+        # runs at ~0.2ms per frame. High frame rate budgets are met in steady state.
         assert mean_ms < 50.0, \
             f"Mean detection time {mean_ms:.1f}ms ≥ 50ms (fresh pipeline budget)"
 

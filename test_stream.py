@@ -20,7 +20,7 @@ from detection import BarDetector
 from config import SEARCH_MARGIN_X_FRAC, SEARCH_MARGIN_Y_FRAC
 
 RESULTS_FILE = 'calibration_results.json'
-FPS = 60  # approximate frame rate for dt computation
+FRAME_DT = 1.0 / 60  # approximate dt between recorded frames
 
 
 def load_frame_and_detect(fpath, det, fake_time):
@@ -109,7 +109,6 @@ def run_stream_test(verbose=False, do_plot=False):
 
     det = BarDetector()
     frame_time = 0.0
-    dt_per_frame = 1.0 / FPS
     current_run_idx = -1
 
     for frame_num in range(start_frame, global_last + 1):
@@ -119,7 +118,7 @@ def run_stream_test(verbose=False, do_plot=False):
         if not os.path.exists(fpath):
             continue
 
-        frame_time += dt_per_frame
+        frame_time += FRAME_DT
         result, img = load_frame_and_detect(fpath, det, frame_time)
         if result is None:
             continue

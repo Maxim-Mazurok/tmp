@@ -1,16 +1,16 @@
 # Location Comparison
 
-Detected tier: 3 (Alamo Sea, Land Act Dam, Roxwood).
+Detected tier: 3 (Alamo Sea, Dam, Roxwood).
 
-Bite wait by location: Alamo Sea 80s, Land Act Dam 90s, Roxwood 100s. Reel-in: 15s.
+Bite wait by location: Alamo Sea 80s, Dam 90s, Roxwood 100s. Reel-in by location: Alamo Sea 15s, Dam 25s, Roxwood 30s.
 
 ~ = estimated (not yet observed in catch data)
 
-| Location     | Fish Caught | $/Fish observed | $/Fish model | Available Bundles                                     | $/Fish (bundles) | $/Fish total (obs) | $/Fish total (model) | $/Hour (model) |
-|--------------|------------:|----------------:|-------------:|-------------------------------------------------------|-----------------:|-------------------:|---------------------:|---------------:|
-| Alamo Sea    |         420 |          $1,472 |       $1,404 | Gold Multizone #1, Alamo Starter, Low Level Multizone |             $655 |             $2,127 |           **$2,059** |        $78,038 |
-| Land Act Dam |         203 |          $1,670 |       $1,670 | Gold Multizone #1, Low Level Multizone                |             $393 |             $2,063 |           **$2,063** |        $70,733 |
-| Roxwood      |         172 |          $1,804 |       $1,871 | Gold Multizone #1, Low Level Multizone                |             $205 |             $2,009 |           **$2,077** |        $65,005 |
+| Location  | Fish Caught | $/Fish observed | $/Fish model | Available Bundles                                     | $/Fish (bundles) | $/Fish total (obs) | $/Fish total (model) | $/Hour (model) |
+|-----------|------------:|----------------:|-------------:|-------------------------------------------------------|-----------------:|-------------------:|---------------------:|---------------:|
+| Alamo Sea |         420 |          $1,472 |       $1,404 | Gold Multizone #1, Alamo Starter, Low Level Multizone |             $655 |             $2,127 |           **$2,059** |        $78,038 |
+| Dam       |         203 |          $1,670 |       $1,670 | Gold Multizone #1, Low Level Multizone                |             $393 |             $2,063 |           **$2,063** |        $64,583 |
+| Roxwood   |         172 |          $1,804 |       $1,871 | Gold Multizone #1, Low Level Multizone                |             $205 |             $2,009 |           **$2,077** |        $57,504 |
 
 ## Optimal Allocation
 
@@ -18,13 +18,13 @@ Optimal time split across locations to maximize total $/hour (considering both s
 
 | Location     | Time % (obs) | $/Fish (obs) | $/Hour (obs) | Time % (model) | $/Fish (model) | $/Hour (model) |
 |--------------|-------------:|-------------:|-------------:|---------------:|---------------:|---------------:|
-| Alamo Sea    |          63% |       $1,472 |      $63,916 |            60% |         $1,404 |        $61,339 |
-| Land Act Dam |          14% |       $1,670 |      $57,264 |            15% |         $1,670 |        $57,264 |
-| Roxwood      |          23% |       $1,804 |      $56,475 |            25% |         $1,871 |        $58,574 |
-| **Combined** |         100% |              |  **$65,710** |           100% |                |    **$64,610** |
+| Alamo Sea    |         100% |       $1,472 |      $63,916 |            62% |         $1,404 |        $61,339 |
+| Dam          |           0% |       $1,670 |      $52,284 |            14% |         $1,670 |        $52,284 |
+| Roxwood      |           0% |       $1,804 |      $49,959 |            24% |         $1,871 |        $51,816 |
+| **Combined** |         100% |              |  **$63,916** |           100% |                |    **$61,881** |
 
-**Observed:** splitting yields **$65,710**/hour vs **$63,916**/hour best solo (+$1,795/hour, +2.8%).
-**Model:** splitting yields **$64,610**/hour vs **$61,339**/hour best solo (+$3,271/hour, +5.3%).
+**Observed:** splitting yields **$63,916**/hour vs **$63,916**/hour best solo (+$0/hour, +0.0%).
+**Model:** splitting yields **$61,881**/hour vs **$61,339**/hour best solo (+$543/hour, +0.9%).
 
 ## Bundle Details
 
@@ -36,10 +36,10 @@ Optimal time split across locations to maximize total $/hour (considering both s
 
 ### Cross-Location
 
-| Bundle              | Fish                             |   Bonus | Avg Fish to Complete | Avg Time | Bonus/Fish | Catch Rates                                                                                                          |
-|---------------------|----------------------------------|--------:|---------------------:|---------:|-----------:|----------------------------------------------------------------------------------------------------------------------|
-| Gold Multizone #1   | Bluefin Tuna, Musky, Dolphinfish | $12,750 |                  201 |  336 min |        $63 | Bluefin Tuna @ Alamo Sea: 3/420 (0.7%) \| Musky @ Land Act Dam: 11/203 (5.4%) \| Dolphinfish @ Roxwood: 4/172 (2.3%) |
-| Low Level Multizone | Scollop, Carp, Grenadier         | $11,000 |                   66 |  120 min |       $167 | Scollop @ Alamo Sea: 47/420 (11.2%) \| Carp @ Land Act Dam: 9/203 (4.4%) \| Grenadier @ Roxwood: 5/172 (2.9%)        |
+| Bundle              | Fish                             |   Bonus | Avg Fish to Complete | Avg Time | Bonus/Fish | Catch Rates                                                                                                 |
+|---------------------|----------------------------------|--------:|---------------------:|---------:|-----------:|-------------------------------------------------------------------------------------------------------------|
+| Gold Multizone #1   | Bluefin Tuna, Musky, Dolphinfish | $12,750 |                  201 |  350 min |        $63 | Bluefin Tuna @ Alamo Sea: 3/420 (0.7%) \| Musky @ Dam: 11/203 (5.4%) \| Dolphinfish @ Roxwood: 4/172 (2.3%) |
+| Low Level Multizone | Scollop, Carp, Grenadier         | $11,000 |                   66 |  132 min |       $167 | Scollop @ Alamo Sea: 47/420 (11.2%) \| Carp @ Dam: 9/203 (4.4%) \| Grenadier @ Roxwood: 5/172 (2.9%)        |
 
 ## Drop Rate Analysis
 
@@ -47,12 +47,12 @@ Optimal time split across locations to maximize total $/hour (considering both s
 
 Tier drop rates are consistent across locations, suggesting a fixed game mechanic:
 
-| Tier        | Alamo Sea | Land Act Dam | Roxwood | Average |
-|-------------|----------:|-------------:|--------:|--------:|
-| ★★★★ purple |      0.2% |         0.0% |    0.0% |    0.1% |
-| ★★★         |      6.4% |        11.3% |    8.7% |    8.8% |
-| ★★          |     26.4% |        27.6% |   32.6% |   28.9% |
-| ★           |     65.5% |        61.1% |   58.7% |   61.8% |
+| Tier        | Alamo Sea |   Dam | Roxwood | Average |
+|-------------|----------:|------:|--------:|--------:|
+| ★★★★ purple |      0.2% |  0.0% |    0.0% |    0.1% |
+| ★★★         |      6.4% | 11.3% |    8.7% |    8.8% |
+| ★★          |     26.4% | 27.6% |   32.6% |   28.9% |
+| ★           |     65.5% | 61.1% |   58.7% |   61.8% |
 
 ### Within-Tier Weights
 
@@ -99,7 +99,7 @@ Model fit (25%/20%/20%/15%/10%/10%): χ² = 2.38, p = 0.795 — excellent
 Weight fit: χ² = 0.36, df = 6, p = 0.999 — excellent
 Model fit (20%/15%/15%/15%/10%/10%/10%/5%): χ² = 1.36, p = 0.968 — excellent
 
-#### Land Act Dam — ★★★ (3 fish, 23 observed)
+#### Dam — ★★★ (3 fish, 23 observed)
 
 | Fish          | Count | Observed % | Weight | Weight % | Model % | Model % (norm) | Residual |
 |---------------|------:|-----------:|-------:|---------:|--------:|---------------:|---------:|
@@ -110,7 +110,7 @@ Model fit (20%/15%/15%/15%/10%/10%/10%/5%): χ² = 1.36, p = 0.968 — excellent
 Weight fit: χ² = 0.48, df = 2, p = 0.788 — excellent
 Model fit (55%/30%/15%): χ² = 0.48, p = 0.787 — excellent
 
-#### Land Act Dam — ★★ (6 fish, 56 observed)
+#### Dam — ★★ (6 fish, 56 observed)
 
 | Fish            | Count | Observed % | Weight | Weight % | Model % | Model % (norm) | Residual |
 |-----------------|------:|-----------:|-------:|---------:|--------:|---------------:|---------:|
@@ -124,7 +124,7 @@ Model fit (55%/30%/15%): χ² = 0.48, p = 0.787 — excellent
 Weight fit: χ² = 1.43, df = 5, p = 0.921 — excellent
 Model fit (25%/20%/20%/15%/10%/10%): χ² = 3.30, p = 0.653 — excellent
 
-#### Land Act Dam — ★ (8 fish, 124 observed)
+#### Dam — ★ (8 fish, 124 observed)
 
 | Fish             | Count | Observed % | Weight | Weight % | Model % | Model % (norm) | Residual |
 |------------------|------:|-----------:|-------:|---------:|--------:|---------------:|---------:|
