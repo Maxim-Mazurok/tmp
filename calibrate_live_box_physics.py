@@ -27,7 +27,6 @@ sys.path.insert(0, '.')
 from capture import ScreenCapture, find_game_window
 from control import FishingController
 from detection import BarDetector
-from config import CONTROL_HZ
 
 import pydirectinput
 
@@ -341,7 +340,7 @@ def build_output_paths(root_dir: str | None) -> tuple[str, str, str]:
 class LiveBoxPhysicsCalibrator:
     """Drive live-input experiments and fit a box-physics proxy model."""
 
-    def __init__(self, output_dir=None, control_hz=CONTROL_HZ):
+    def __init__(self, output_dir=None, control_hz=FishingController.REFERENCE_HZ):
         self.control_hz = control_hz
         self.dt = 1.0 / control_hz
         self.output_dir, self.csv_path, self.summary_path = build_output_paths(output_dir)

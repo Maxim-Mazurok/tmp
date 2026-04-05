@@ -18,7 +18,7 @@ from config import (
     BLUE_H_MIN, BLUE_H_MAX,
     SEARCH_MARGIN_X_FRAC, SEARCH_MARGIN_Y_FRAC,
     CAST_DELAY, BITE_WAIT, MINIGAME_GRACE, CAST_WAIT_POLL,
-    BAR_APPEAR_DELAY, CONTROL_HZ,
+    BAR_APPEAR_DELAY,
 )
 from detection import BarDetector
 from capture import ScreenCapture, find_game_window
@@ -40,12 +40,12 @@ DEBUG_FONT_SCALE = 0.5
 DEBUG_FONT_THICKNESS = 1
 DEBUG_PADDING = 10
 DEBUG_PANEL_MIN_WIDTH = 420
-DEBUG_PREDICTION_FRAMES = (1, 2, 3, 5, 8)
+DEBUG_PREDICTION_TIMES = (0.017, 0.033, 0.050, 0.083, 0.133)  # seconds ahead
 LIVE_DEBUG_BUFFER_FRAMES = 120
 LIVE_DEBUG_DUMP_FRAMES = 45
 LIVE_DEBUG_OVERLAP_MARGIN = 0.03
 LIVE_DEBUG_JUMP_THRESHOLD = 0.05
-LIVE_DEBUG_DUMP_COOLDOWN = 45
+LIVE_DEBUG_DUMP_COOLDOWN_SECONDS = 0.75
 PROJECTION_SUMMARY_WRITE_INTERVAL = 25
 _FILE_WRITE_SENTINEL = object()
 
@@ -178,13 +178,12 @@ def _format_direction_code(direction_code):
 
 
 def _predict_fish_positions(detector):
-    """Predict fish positions for the next few control frames."""
+    """Predict fish positions for several future time offsets."""
     predictions = []
     velocity = getattr(detector, 'virtual_fish_velocity', detector.fish_velocity)
-    for frames_ahead in DEBUG_PREDICTION_FRAMES:
-        dt = frames_ahead / CONTROL_HZ
-        predicted = detector.fish_y + velocity * dt
-        predictions.append((frames_ahead, max(0.0, min(1.0, predicted))))
+    for time_offset in DEBUG_PREDICTION_TIMES:
+        predicted = detector.fish_y + velocity * time_offset
+        predictions.append((time_offset, max(0.0, min(1.0, predicted))))
     return predictions
 
 
@@ -197,20 +196,22 @@ def _draw_prediction_markers(vis, detector, fish_predictions, box_predictions):
     cx1, cx2 = detector.col_x1, detector.col_x2
     col_h = max(cy2 - cy1, 1)
 
-    for idx, (frames_ahead, predicted) in enumerate(fish_predictions):
+    for idx, (time_offset, predicted) in enumerate(fish_predictions):
         pred_y = cy1 + int(predicted * col_h)
         shade = max(80, 255 - idx * 30)
         color = (shade, 180, 255 - idx * 20)
         cv2.line(vis, (max(0, cx1 - 16), pred_y), (max(0, cx1 - 2), pred_y), color, 1)
-        cv2.putText(vis, f'F+{frames_ahead}', (max(0, cx1 - 46), pred_y - 2),
+        label = f'F+{time_offset * 1000:.0f}ms'
+        cv2.putText(vis, label, (max(0, cx1 - 56), pred_y - 2),
                     DEBUG_FONT, 0.35, color, 1)
 
-    for idx, (frames_ahead, predicted) in enumerate(box_predictions):
+    for idx, (time_offset, predicted) in enumerate(box_predictions):
         pred_y = cy1 + int(predicted * col_h)
         shade = max(80, 255 - idx * 30)
         color = (255 - idx * 20, shade, shade)
         cv2.line(vis, (cx2 + 2, pred_y), (min(vis.shape[1] - 1, cx2 + 16), pred_y), color, 1)
-        cv2.putText(vis, f'B+{frames_ahead}', (min(vis.shape[1] - 40, cx2 + 18), pred_y - 2),
+        label = f'B+{time_offset * 1000:.0f}ms'
+        cv2.putText(vis, label, (min(vis.shape[1] - 40, cx2 + 18), pred_y - 2),
                     DEBUG_FONT, 0.35, color, 1)
     return vis
 
@@ -218,7 +219,7 @@ def _draw_prediction_markers(vis, detector, fish_predictions, box_predictions):
 def _compose_debug_display(vis, detector, controller, state_ctx):
     """Compose the bar visualization with a side telemetry panel."""
     fish_predictions = _predict_fish_positions(detector)
-    box_predictions = controller.predict_box_positions(detector, DEBUG_PREDICTION_FRAMES, CONTROL_HZ)
+    box_predictions = controller.predict_box_positions(detector, DEBUG_PREDICTION_TIMES)
     vis = _draw_prediction_markers(vis, detector, fish_predictions, box_predictions)
     intercept_plan = controller.last_intercept_plan
 
@@ -245,14 +246,14 @@ def _compose_debug_display(vis, detector, controller, state_ctx):
         f"BOX VEL   dir={_format_direction(controller.last_box_velocity):>6}  vel={controller.last_box_velocity:+7.3f}",
         f"CONTROL   err={controller.last_error:+7.3f}  rate={controller.last_error_rate:+7.3f}",
         f"ERR RATE  {controller.last_error_rate:+7.3f}  history={len(detector.fish_y_history):2d}",
-        f"MEET      +{intercept_plan['frames_ahead']:2d}f  t={intercept_plan['target_seconds'] * 1000:5.0f}ms  gap={intercept_plan['predicted_abs_gap']:6.3f}" if intercept_plan else 'MEET      n/a',
+        f"MEET      +{intercept_plan['frames_ahead']:2d}  t={intercept_plan['target_seconds'] * 1000:5.0f}ms  gap={intercept_plan['predicted_abs_gap']:6.3f}" if intercept_plan else 'MEET      n/a',
         f"MEET POS  fish={intercept_plan['predicted_fish_y']:6.3f}  box={intercept_plan['predicted_box_y']:6.3f}  hold={intercept_plan['hold_ratio']:5.1%}" if intercept_plan else 'MEET POS  n/a',
         f"BAR       blue_max={state_ctx['max_blue_seen']:6.1%}  low_blue={state_ctx['low_blue_count']:2d}",
-        f"CAPTURE   {region_w}x{region_h}  strip={vis.shape[1]}x{vis.shape[0]}",
-        "NEXT FISH " + '  '.join(f"+{frames}:{value:0.3f}" for frames, value in fish_predictions[:3]),
-        "NEXT FISH " + '  '.join(f"+{frames}:{value:0.3f}" for frames, value in fish_predictions[3:]),
-        "NEXT BOX  " + '  '.join(f"+{frames}:{value:0.3f}" for frames, value in box_predictions[:3]),
-        "NEXT BOX  " + '  '.join(f"+{frames}:{value:0.3f}" for frames, value in box_predictions[3:]),
+        f"CAPTURE   {region_w}x{region_h}  strip={vis.shape[1]}x{vis.shape[0]}  dt={controller.last_dt * 1000:.1f}ms ({1.0 / max(controller.last_dt, 1e-6):.0f}Hz)",
+        "NEXT FISH " + '  '.join(f"+{time_offset * 1000:.0f}ms:{value:0.3f}" for time_offset, value in fish_predictions[:3]),
+        "NEXT FISH " + '  '.join(f"+{time_offset * 1000:.0f}ms:{value:0.3f}" for time_offset, value in fish_predictions[3:]),
+        "NEXT BOX  " + '  '.join(f"+{time_offset * 1000:.0f}ms:{value:0.3f}" for time_offset, value in box_predictions[:3]),
+        "NEXT BOX  " + '  '.join(f"+{time_offset * 1000:.0f}ms:{value:0.3f}" for time_offset, value in box_predictions[3:]),
     ]
 
     text_sizes = [cv2.getTextSize(line, DEBUG_FONT, DEBUG_FONT_SCALE, DEBUG_FONT_THICKNESS)[0]
@@ -305,7 +306,7 @@ def _create_live_debug_recorder(enabled):
         'projection_path': projection_path,
         'projection_summary_path': projection_summary_path,
         'buffer': deque(maxlen=LIVE_DEBUG_BUFFER_FRAMES),
-        'last_dump_frame': -LIVE_DEBUG_DUMP_COOLDOWN,
+        'last_dump_time': -LIVE_DEBUG_DUMP_COOLDOWN_SECONDS,
         'dump_count': 0,
         'last_note': None,
         'projection_pending': [],
@@ -343,7 +344,6 @@ def _write_projection_summary(recorder, controller):
         current_lookahead=controller.LOOKAHEAD,
         current_gravity=controller.GRAVITY,
         current_thrust=controller.THRUST,
-        control_hz=CONTROL_HZ,
     )
     summary['session_dir'] = recorder['session_dir']
     recorder['writer'].write_json(recorder['projection_summary_path'], summary, indent=2)
@@ -358,7 +358,7 @@ def _update_projection_calibration(state_ctx, detector, controller):
     current_frame = int(state_ctx['minigame_frames'])
     recorder['projection_frames'][current_frame] = _build_projection_actual_frame(state_ctx, detector)
 
-    min_frame = current_frame - (controller.PROJECTION_HORIZON_FRAMES + PROJECTION_TIMING_WINDOW_FRAMES + 5)
+    min_frame = current_frame - (int(controller.PROJECTION_HORIZON_SECONDS * controller.REFERENCE_HZ) + PROJECTION_TIMING_WINDOW_FRAMES + 5)
     stale_frames = [frame for frame in recorder['projection_frames'] if frame < min_frame]
     for frame in stale_frames:
         recorder['projection_frames'].pop(frame, None)
@@ -484,11 +484,12 @@ def _dump_live_debug_buffer(state_ctx, reason):
     if recorder is None or not recorder['buffer']:
         return
 
-    frame_index = state_ctx['minigame_frames']
-    if frame_index - recorder['last_dump_frame'] < LIVE_DEBUG_DUMP_COOLDOWN:
+    now = state_ctx['now']
+    if now - recorder['last_dump_time'] < LIVE_DEBUG_DUMP_COOLDOWN_SECONDS:
         return
 
-    recorder['last_dump_frame'] = frame_index
+    frame_index = state_ctx['minigame_frames']
+    recorder['last_dump_time'] = now
     recorder['dump_count'] += 1
     dump_name = f"{recorder['dump_count']:03d}_{frame_index:05d}_{reason}"
     dump_dir = os.path.join(recorder['events_dir'], dump_name)
@@ -677,6 +678,7 @@ def _check_blue_bar_gone(state_ctx, col_strip, blue_ratio, catch_allowed):
     if blue_ratio < 0.10:
         state_ctx['low_blue_count'] += 1
         if state_ctx['low_blue_count'] == 1:
+            state_ctx['low_blue_start'] = now
             diag_dir = os.path.join(os.path.dirname(__file__), 'diag_blue_gone')
             recorder = state_ctx.get('debug_recorder')
             if recorder is not None:
@@ -689,9 +691,12 @@ def _check_blue_bar_gone(state_ctx, col_strip, blue_ratio, catch_allowed):
                   f"strip={col_strip.shape} region={state_ctx['region']}")
     else:
         state_ctx['low_blue_count'] = 0
+        state_ctx['low_blue_start'] = None
 
-    LOW_BLUE_THRESHOLD = 90
-    if state_ctx['low_blue_count'] >= LOW_BLUE_THRESHOLD and catch_allowed:
+    LOW_BLUE_SECONDS = 1.5
+    low_blue_start = state_ctx.get('low_blue_start')
+    low_blue_elapsed = (now - low_blue_start) if low_blue_start is not None else 0.0
+    if low_blue_elapsed >= LOW_BLUE_SECONDS and catch_allowed:
         if state_ctx['max_blue_seen'] < 0.70:
             print(f"[!] False bar: blue never exceeded {state_ctx['max_blue_seen']:.1%} "
                   f"(need 70%). Recasting.")
@@ -702,6 +707,7 @@ def _check_blue_bar_gone(state_ctx, col_strip, blue_ratio, catch_allowed):
                 pydirectinput.keyUp('space')
                 controller.space_held = False
             state_ctx['low_blue_count'] = 0
+            state_ctx['low_blue_start'] = None
             return True
         print(f"[*] Blue bar gone ({state_ctx['low_blue_count']} frames, ratio={blue_ratio:.1%}). Fish caught!")
         diag_dir = os.path.join(os.path.dirname(__file__), 'diag_blue_gone')
@@ -723,6 +729,7 @@ def _check_blue_bar_gone(state_ctx, col_strip, blue_ratio, catch_allowed):
             controller.space_held = False
         state_ctx['catches'] += 1
         state_ctx['low_blue_count'] = 0
+        state_ctx['low_blue_start'] = None
         return True
     return False
 
@@ -794,10 +801,10 @@ def _handle_minigame(state_ctx):
         state_ctx['max_blue_seen'] = max(state_ctx['max_blue_seen'], blue_ratio)
 
         # Early bail-out: if blue ratio has never been high in the first
-        # ~30 frames (~0.5s), this is almost certainly a false detection.
-        EARLY_BAIL_FRAMES = 30
+        # ~0.5s, this is almost certainly a false detection.
+        EARLY_BAIL_SECONDS = 0.5
         EARLY_BAIL_MIN_BLUE = 0.40
-        if (state_ctx['minigame_frames'] >= EARLY_BAIL_FRAMES
+        if (minigame_elapsed >= EARLY_BAIL_SECONDS
                 and state_ctx['max_blue_seen'] < EARLY_BAIL_MIN_BLUE):
             print(f"[!] Early bail: blue never exceeded {state_ctx['max_blue_seen']:.1%} "
                   f"in {state_ctx['minigame_frames']} frames. False detection.")
@@ -923,7 +930,7 @@ def _handle_minigame(state_ctx):
     # Run controller
     was_held = controller.space_held
     should_hold = controller.update(detector)
-    controller.predict_intercept_plan(detector, CONTROL_HZ, source_frame=state_ctx['minigame_frames'])
+    controller.predict_intercept_plan(detector, source_frame=state_ctx['minigame_frames'])
     if should_hold != was_held:
         if should_hold:
             pydirectinput.keyDown('space')
@@ -947,13 +954,6 @@ def _handle_minigame(state_ctx):
     state_ctx['prev_debug_fish_y'] = detector.fish_y
 
     detector.col_x1, detector.col_x2, detector.col_y1, detector.col_y2, detector.prog_x1, detector.prog_x2 = abs_coords
-
-    # Rate limit
-    elapsed = time.perf_counter() - loop_start
-    control_interval = 1.0 / CONTROL_HZ
-    sleep_time = control_interval - elapsed
-    if sleep_time > 0:
-        time.sleep(sleep_time)
 
 
 def _handle_caught(state_ctx):
@@ -1059,6 +1059,7 @@ def run_automation(debug=False, reel_only=False):
         'minigame_frames': 0,
         'last_status_log': 0.0,
         'low_blue_count': 0,
+        'low_blue_start': None,
         'max_blue_seen': 0.0,
         'search_offset_x': 0,
         'search_offset_y': 0,

@@ -16,7 +16,7 @@ from config import (
     PROGRESS_H_MIN, PROGRESS_H_MAX, PROGRESS_S_MIN, PROGRESS_V_MIN,
     HYSTERESIS,
     CAST_DELAY, BITE_WAIT, MINIGAME_GRACE, CAST_WAIT_POLL,
-    BAR_APPEAR_DELAY, CONTROL_HZ, BAR_REDETECT_INTERVAL,
+    BAR_APPEAR_DELAY, BAR_REDETECT_INTERVAL,
     SEARCH_MARGIN_X_FRAC, SEARCH_MARGIN_Y_FRAC,
 )
 from control import FishingController
@@ -72,10 +72,6 @@ class TestTimingParameters:
 
     def test_minigame_grace_shorter_than_bite_wait(self):
         assert MINIGAME_GRACE < BITE_WAIT
-
-    def test_control_hz_reasonable(self):
-        """Control loop should run at 30-120 Hz."""
-        assert 30 <= CONTROL_HZ <= 120
 
     def test_bar_redetect_interval_positive(self):
         assert BAR_REDETECT_INTERVAL > 0

@@ -67,50 +67,57 @@ class TestControllerUpdate:
 
     def test_returns_bool(self, controller):
         det = self._make_detector()
-        result = controller.update(det)
+        result = controller.update(det, now=0.0)
         assert isinstance(result, bool)
 
     def test_fish_above_box_holds_space(self, controller):
         """When fish is above box (lower y value), controller should hold space more."""
         det = self._make_detector(fish_y=0.2, box_center=0.8)
+        dt = 1.0 / controller.REFERENCE_HZ
         # Run several updates to see the pattern
-        holds = sum(controller.update(det) for _ in range(20))
+        holds = sum(controller.update(det, now=i * dt) for i in range(20))
         # With fish far above box, duty should be high (>HOVER), so more holds
         assert holds > 10, f"Expected mostly holds when fish above box, got {holds}/20"
 
     def test_fish_below_box_releases_space(self, controller):
         """When fish is below box (higher y value), controller should release more."""
         det = self._make_detector(fish_y=0.8, box_center=0.2)
-        holds = sum(controller.update(det) for _ in range(20))
+        dt = 1.0 / controller.REFERENCE_HZ
+        holds = sum(controller.update(det, now=i * dt) for i in range(20))
         # With fish far below box, duty should be low (<HOVER), so fewer holds
         assert holds < 10, f"Expected mostly releases when fish below box, got {holds}/20"
 
     def test_fish_at_box_center_hovers(self, controller):
-        """When fish is at box center, duty should be near HOVER (~47%)."""
+        """When fish is at box center, duty should be near HOVER (~90%)."""
         det = self._make_detector(fish_y=0.5, box_center=0.5)
-        holds = sum(controller.update(det) for _ in range(100))
-        # Should hover around 47% (HOVER)
+        dt = 1.0 / controller.REFERENCE_HZ
+        holds = sum(controller.update(det, now=i * dt) for i in range(100))
+        # Should hover around 90% (HOVER = gravity/thrust ≈ 0.897)
         hover_pct = holds / 100
-        assert 0.3 < hover_pct < 0.65, \
-            f"Expected hover ~47%, got {hover_pct:.0%}"
+        assert 0.7 < hover_pct < 1.0, \
+            f"Expected hover ~90%, got {hover_pct:.0%}"
 
     def test_duty_clamped_0_1(self, controller):
         """Duty should never exceed [0, 1]."""
+        dt = 1.0 / controller.REFERENCE_HZ
         # Extreme error case
         det = self._make_detector(fish_y=0.0, box_center=1.0)
-        for _ in range(50):
-            controller.update(det)
+        for i in range(50):
+            controller.update(det, now=i * dt)
         assert 0.0 <= controller._duty <= 1.0
 
+        controller.reset()
         det = self._make_detector(fish_y=1.0, box_center=0.0)
-        for _ in range(50):
-            controller.update(det)
+        for i in range(50):
+            controller.update(det, now=100.0 + i * dt)
         assert 0.0 <= controller._duty <= 1.0
 
     def test_accumulator_drives_pwm(self, controller):
         """The accumulator-based PWM should produce varying hold/release patterns."""
-        det = self._make_detector(fish_y=0.35, box_center=0.5)
-        pattern = [controller.update(det) for _ in range(30)]
+        # fish_y ≈ box_center so duty lands near HOVER (~0.9), producing mixed PWM
+        det = self._make_detector(fish_y=0.50, box_center=0.50)
+        dt = 1.0 / controller.REFERENCE_HZ
+        pattern = [controller.update(det, now=i * dt) for i in range(30)]
         # Should have a mix of holds and releases (not all one or the other)
         assert 0 < sum(pattern) < 30, \
             f"PWM pattern should be mixed: {sum(pattern)} holds out of 30"
@@ -124,16 +131,16 @@ class TestControllerUpdate:
         )
         # Simulate box moving up toward fish (box velocity negative in screen coords)
         controller._last_box = 0.52
-        controller._last_box_time = time.perf_counter() - 0.016  # ~1 frame ago
+        controller._last_box_time = 1.0 - 0.016  # ~1 frame ago
 
-        controller.update(det)
+        controller.update(det, now=1.0)
         # The derivative term should reduce the duty (braking)
         # Compared to a case without derivative...
         duty_with_braking = controller._duty
 
         # Reset and try without braking history
         controller.reset()
-        controller.update(det)
+        controller.update(det, now=2.0)
         duty_without_braking = controller._duty
 
         # With braking, duty should differ from without
@@ -187,8 +194,8 @@ class TestControllerLookahead:
         assert isinstance(controller.last_box_velocity, float)
         assert isinstance(controller.last_error_rate, float)
 
-    def test_box_projection_returns_requested_frames(self, controller):
-        """White-box projections should be produced for each requested future frame."""
+    def test_box_projection_returns_requested_times(self, controller):
+        """White-box projections should be produced for each requested future time offset."""
         det = BarDetector()
         det.box_center = 0.4
 
@@ -196,9 +203,10 @@ class TestControllerLookahead:
         controller._accumulator = 0.2
         controller.last_box_velocity = -0.1
 
-        projections = controller.predict_box_positions(det, [1, 3, 5], control_hz=60)
+        time_offsets = [1 / 60, 3 / 60, 5 / 60]
+        projections = controller.predict_box_positions(det, time_offsets)
 
-        assert [frame for frame, _ in projections] == [1, 3, 5]
+        assert len(projections) == 3
         assert all(0.0 <= value <= 1.0 for _, value in projections)
 
     def test_intercept_plan_tracks_future_meeting(self, controller):
@@ -211,13 +219,14 @@ class TestControllerLookahead:
         det.fish_velocity = 0.35
 
         controller.update(det)
-        plan = controller.predict_intercept_plan(det, control_hz=60, source_frame=10)
+        plan = controller.predict_intercept_plan(det, source_frame=10)
 
         assert plan is controller.last_intercept_plan
         assert plan['target_frame'] > 10
-        assert 1 <= plan['frames_ahead'] <= controller.PROJECTION_HORIZON_FRAMES
-        assert len(plan['fish_path']) == controller.PROJECTION_HORIZON_FRAMES
-        assert len(plan['box_path']) == controller.PROJECTION_HORIZON_FRAMES
+        horizon_steps = max(1, round(controller.PROJECTION_HORIZON_SECONDS * controller.REFERENCE_HZ))
+        assert 1 <= plan['frames_ahead'] <= horizon_steps
+        assert len(plan['fish_path']) == horizon_steps
+        assert len(plan['box_path']) == horizon_steps
         assert 0.0 <= plan['predicted_fish_y'] <= 1.0
         assert 0.0 <= plan['predicted_box_y'] <= 1.0
 
@@ -235,7 +244,7 @@ class TestControllerLookahead:
 
         assert controller.last_fish_pred == pytest.approx(0.5 + 0.4 * controller.LOOKAHEAD)
 
-        plan = controller.predict_intercept_plan(det, control_hz=60, source_frame=20)
+        plan = controller.predict_intercept_plan(det, source_frame=20)
         assert plan['fish_velocity'] == pytest.approx(0.4)
         assert plan['confirmed_fish_velocity'] == pytest.approx(-0.3)
 

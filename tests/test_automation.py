@@ -86,7 +86,7 @@ def test_dump_live_debug_buffer_queues_images_and_summary(tmp_path):
                 'debug_img': None,
             },
         ],
-        'last_dump_frame': -automation.LIVE_DEBUG_DUMP_COOLDOWN,
+        'last_dump_time': -automation.LIVE_DEBUG_DUMP_COOLDOWN_SECONDS,
         'dump_count': 0,
         'events_dir': str(tmp_path / 'events'),
         'session_dir': str(tmp_path),
@@ -95,12 +95,13 @@ def test_dump_live_debug_buffer_queues_images_and_summary(tmp_path):
     state_ctx = {
         'debug_recorder': recorder,
         'minigame_frames': 42,
+        'now': 10.0,
     }
 
     automation._dump_live_debug_buffer(state_ctx, 'fish_jump')
 
     assert recorder['dump_count'] == 1
-    assert recorder['last_dump_frame'] == 42
+    assert recorder['last_dump_time'] == 10.0
     assert len(writer.image_writes) == 3
     assert len(writer.json_writes) == 1
     summary_path, summary_payload, indent = writer.json_writes[0]

@@ -26,6 +26,7 @@ class FishingController:
     natural braking, plus accumulator for smooth PWM output.
     """
 
+    REFERENCE_HZ = 60  # PWM normalization rate (physics calibrated at 60 Hz)
     Kp = 1.5   # proportional gain
     Kd = 1.0   # derivative gain (on error rate)
     GRAVITY = PHYSICS_PROFILE.gravity
@@ -33,7 +34,7 @@ class FishingController:
     HOVER = PHYSICS_PROFILE.hover
     HOVER_BIAS = 0.05  # upward bias to compensate systematic box-below-fish drift
     LOOKAHEAD = 0.095  # seconds to predict fish position ahead (~input lag)
-    PROJECTION_HORIZON_FRAMES = 12
+    PROJECTION_HORIZON_SECONDS = 0.2  # ~12 frames at 60 Hz
     TRACKING_PROGRESS_THRESHOLD = 0.003
     TRACKING_KP_SCALE = 0.45
     TRACKING_KD_SCALE = 1.20
@@ -47,12 +48,14 @@ class FishingController:
         self._accumulator = 0.0
         self._last_box = None
         self._last_box_time = 0.0
+        self._last_update_time = None
         self.last_fish_pred = 0.5
         self.last_box_velocity = 0.0
         self.last_error = 0.0
         self.last_error_rate = 0.0
         self.last_intercept_plan = None
         self.last_tracking_mode = 'normal'
+        self.last_dt = 1.0 / self.REFERENCE_HZ
 
     @staticmethod
     def _prediction_velocity(detector):
@@ -108,6 +111,14 @@ class FishingController:
         if now is None:
             now = time.perf_counter()
 
+        # Compute actual dt from last update
+        if self._last_update_time is not None:
+            dt = min(now - self._last_update_time, 0.1)  # cap at 100ms to prevent stutter issues
+        else:
+            dt = 1.0 / self.REFERENCE_HZ  # first call fallback
+        self._last_update_time = now
+        self.last_dt = dt
+
         # Predict where the fish WILL BE, not where it is now.
         # Accounts for input lag (~100ms) + box acceleration time.
         prediction_velocity = self._prediction_velocity(detector)
@@ -149,13 +160,19 @@ class FishingController:
         self._duty = effective_hover - self.Kp * kp_scale * error - d_term
         self._duty = max(0.0, min(1.0, self._duty))
 
-        # Accumulator-based PWM: evenly spreads hold frames
-        self._accumulator += self._duty
-        if self._accumulator >= 1.0:
+        # Accumulator-based PWM: scale by actual dt so duty ratio
+        # is time-averaged rather than frame-averaged.
+        self._accumulator += self._duty * dt * self.REFERENCE_HZ
+        # Epsilon handles floating-point rounding when dt comes from
+        # accumulated timestamps (e.g. dt*60 = 0.99999999… instead of 1.0).
+        if self._accumulator >= 1.0 - 1e-9:
             self._accumulator -= 1.0
+            self._accumulator = max(self._accumulator, 0.0)
             self.space_held = True
         else:
             self.space_held = False
+        # Clamp to prevent runaway accumulation during stutters
+        self._accumulator = min(self._accumulator, 1.0)
 
         return self.space_held
 
@@ -165,35 +182,49 @@ class FishingController:
         self._accumulator = 0.0
         self._last_box = None
         self._last_box_time = 0.0
+        self._last_update_time = None
         self.last_fish_pred = 0.5
         self.last_box_velocity = 0.0
         self.last_error = 0.0
         self.last_error_rate = 0.0
         self.last_intercept_plan = None
         self.last_tracking_mode = 'normal'
+        self.last_dt = 1.0 / self.REFERENCE_HZ
 
-    def predict_fish_positions(self, detector, frame_offsets, control_hz):
-        """Project future fish positions assuming current velocity persists briefly."""
+    def predict_fish_positions(self, detector, time_offsets):
+        """Project future fish positions assuming current velocity persists briefly.
+
+        Args:
+            detector: Current bar detector state.
+            time_offsets: Sequence of future time offsets in seconds.
+        """
         predictions = []
-        hz = max(control_hz, 1)
         prediction_velocity = self._prediction_velocity(detector)
-        for frame_offset in sorted(frame_offsets):
-            dt = frame_offset / hz
-            predicted = detector.fish_y + prediction_velocity * dt
-            predictions.append((frame_offset, max(0.0, min(1.0, predicted))))
+        for time_offset in sorted(time_offsets):
+            predicted = detector.fish_y + prediction_velocity * time_offset
+            predictions.append((time_offset, max(0.0, min(1.0, predicted))))
         return predictions
 
-    def _simulate_box_path(self, detector, frame_count, control_hz):
-        """Simulate future box centers using the current PWM duty and physics."""
-        dt = 1.0 / max(control_hz, 1)
+    def _simulate_box_path(self, detector, time_horizon):
+        """Simulate future box centers using the current PWM duty and physics.
+
+        Internally steps at REFERENCE_HZ for consistency with calibrated physics.
+
+        Args:
+            detector: Current bar detector state.
+            time_horizon: Duration in seconds to simulate ahead.
+        """
+        dt = 1.0 / self.REFERENCE_HZ
+        step_count = max(1, round(time_horizon * self.REFERENCE_HZ))
         accumulator = self._accumulator
         box_center = detector.box_center
         box_velocity = self.last_box_velocity
         positions = []
         hold_path = []
+        timestamps = []
 
-        for _ in range(frame_count):
-            accumulator += self._duty
+        for step in range(step_count):
+            accumulator += self._duty * dt * self.REFERENCE_HZ
             hold = accumulator >= 1.0
             if hold:
                 accumulator -= 1.0
@@ -211,36 +242,59 @@ class FishingController:
 
             positions.append(box_center)
             hold_path.append(hold)
+            timestamps.append((step + 1) * dt)
 
-        return positions, hold_path
+        return positions, hold_path, timestamps
 
-    def predict_box_positions(self, detector, frame_offsets, control_hz):
-        """Project future white-box center positions using current PWM state and physics."""
-        if not frame_offsets:
+    def predict_box_positions(self, detector, time_offsets):
+        """Project future white-box center positions using current PWM state and physics.
+
+        Args:
+            detector: Current bar detector state.
+            time_offsets: Sequence of future time offsets in seconds.
+        """
+        if not time_offsets:
             return []
 
-        path, _ = self._simulate_box_path(detector, max(frame_offsets), control_hz)
-        results = [(target_frame, path[target_frame - 1]) for target_frame in sorted(frame_offsets)]
+        max_time = max(time_offsets)
+        path, _, timestamps = self._simulate_box_path(detector, max_time)
+        results = []
+        for target_time in sorted(time_offsets):
+            # Find the closest simulated step to the requested time offset
+            best_index = min(range(len(timestamps)),
+                             key=lambda idx: abs(timestamps[idx] - target_time))
+            results.append((target_time, path[best_index]))
         return results
 
-    def predict_intercept_plan(self, detector, control_hz, source_frame=0, horizon_frames=None):
+    def predict_intercept_plan(self, detector, source_frame=0, horizon_seconds=None):
         """Predict when the current box and fish trajectories should meet next."""
-        horizon = horizon_frames or self.PROJECTION_HORIZON_FRAMES
+        horizon = horizon_seconds if horizon_seconds is not None else self.PROJECTION_HORIZON_SECONDS
         if horizon <= 0:
             return None
 
-        frame_offsets = list(range(1, horizon + 1))
-        fish_positions = [value for _, value in self.predict_fish_positions(detector, frame_offsets, control_hz)]
-        box_positions, hold_path = self._simulate_box_path(detector, horizon, control_hz)
-        best_index = min(range(horizon), key=lambda idx: abs(box_positions[idx] - fish_positions[idx]))
-        frames_ahead = best_index + 1
-        hold_ratio = sum(hold_path[:frames_ahead]) / frames_ahead
+        # Simulate box path at reference rate
+        box_positions, hold_path, timestamps = self._simulate_box_path(detector, horizon)
+        step_count = len(box_positions)
+        if step_count == 0:
+            return None
+
+        # Predict fish at the same time offsets
+        fish_positions = []
+        prediction_velocity = self._prediction_velocity(detector)
+        for timestamp in timestamps:
+            predicted = detector.fish_y + prediction_velocity * timestamp
+            fish_positions.append(max(0.0, min(1.0, predicted)))
+
+        best_index = min(range(step_count), key=lambda idx: abs(box_positions[idx] - fish_positions[idx]))
+        target_seconds = timestamps[best_index]
+        steps_ahead = best_index + 1
+        hold_ratio = sum(hold_path[:steps_ahead]) / steps_ahead
 
         plan = {
             'source_frame': int(source_frame),
-            'target_frame': int(source_frame + frames_ahead),
-            'frames_ahead': frames_ahead,
-            'target_seconds': frames_ahead / max(control_hz, 1),
+            'target_frame': int(source_frame + steps_ahead),
+            'frames_ahead': steps_ahead,
+            'target_seconds': target_seconds,
             'predicted_fish_y': fish_positions[best_index],
             'predicted_box_y': box_positions[best_index],
             'predicted_signed_gap': box_positions[best_index] - fish_positions[best_index],

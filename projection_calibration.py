@@ -112,13 +112,12 @@ def resolve_projection_outcome(plan: dict, actual_frames: dict[int, dict],
 
 
 def summarize_projection_outcomes(outcomes: list[dict], *, current_lookahead: float,
-                                  current_gravity: float, current_thrust: float,
-                                  control_hz: float) -> dict:
+                                  current_gravity: float, current_thrust: float) -> dict:
     """Summarize resolved projection outcomes into calibration hints."""
     if not outcomes:
         return {
             'samples': 0,
-            'timing': {'mean_frames': 0.0, 'median_frames': 0.0, 'mean_ms': 0.0},
+            'timing': {'mean_seconds': 0.0, 'median_seconds': 0.0, 'mean_ms': 0.0},
             'errors': {'mean_abs_fish_error': 0.0, 'mean_abs_box_error': 0.0, 'mean_abs_gap_error': 0.0},
             'reward': {
                 'positive_samples': 0,
@@ -137,7 +136,6 @@ def summarize_projection_outcomes(outcomes: list[dict], *, current_lookahead: fl
     fish_abs_errors = [abs(outcome['fish_error']) for outcome in outcomes]
     box_abs_errors = [abs(outcome['box_error']) for outcome in outcomes]
     gap_abs_errors = [abs(outcome['gap_error']) for outcome in outcomes]
-    timing_errors = [float(outcome['timing_error_frames']) for outcome in outcomes]
     reward_positive = [outcome for outcome in outcomes if float(outcome.get('best_window_progress_delta', 0.0)) > 0.0]
     suggestion_source = reward_positive or outcomes
 
@@ -181,12 +179,14 @@ def summarize_projection_outcomes(outcomes: list[dict], *, current_lookahead: fl
     target_reward_deltas = [float(outcome.get('target_progress_delta', 0.0)) for outcome in outcomes]
     rewarded_gaps = [abs(float(outcome['actual_target_signed_gap'])) for outcome in reward_positive]
 
+    timing_errors_seconds = [float(outcome['target_seconds']) for outcome in outcomes if 'target_seconds' in outcome]
+
     return {
         'samples': len(outcomes),
         'timing': {
-            'mean_frames': mean(timing_errors),
-            'median_frames': median(timing_errors),
-            'mean_ms': mean(timing_errors) * 1000.0 / max(control_hz, 1e-6),
+            'mean_seconds': mean(timing_errors_seconds) if timing_errors_seconds else 0.0,
+            'median_seconds': median(timing_errors_seconds) if timing_errors_seconds else 0.0,
+            'mean_ms': mean(timing_errors_seconds) * 1000.0 if timing_errors_seconds else 0.0,
         },
         'errors': {
             'mean_abs_fish_error': mean(fish_abs_errors),
