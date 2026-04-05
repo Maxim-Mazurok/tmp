@@ -64,8 +64,8 @@ class InventoryHandler:
         if not self._detect_inventory_text(img):
             return False
 
-        # --- Step 2: Find the grid slot at row 2, column 1 ---
-        slot_center = self._find_grid_slot(img, row=1, col=0)
+        # --- Step 2: Find the grid slot at row 1, column 4 (0-indexed: row=0, col=3) ---
+        slot_center = self._find_grid_slot(img, row=0, col=1)
         if slot_center is None:
             return False
 
