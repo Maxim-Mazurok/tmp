@@ -19,12 +19,16 @@ def find_game_window(title_part='fivem'):
     user32 = ctypes.windll.user32
     results = []
 
+    # Window titles to exclude (e.g. Discord showing FiveM server names)
+    exclude = ['discord']
+
     def callback(hwnd, _):
         length = user32.GetWindowTextLengthW(hwnd)
         if length > 0:
             buf = ctypes.create_unicode_buffer(length + 1)
             user32.GetWindowTextW(hwnd, buf, length + 1)
-            if title_part.lower() in buf.value.lower():
+            title_lower = buf.value.lower()
+            if title_part.lower() in title_lower and not any(ex in title_lower for ex in exclude):
                 rect = ctypes.wintypes.RECT()
                 user32.GetWindowRect(hwnd, ctypes.byref(rect))
                 w = rect.right - rect.left
