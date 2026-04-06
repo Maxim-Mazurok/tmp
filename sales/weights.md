@@ -1,7 +1,7 @@
 # Fish Value Per Gram
 
-Fish with known weights: 25 / 103
-Fish with unknown weights: 78
+Fish with known weights: 36 / 103
+Fish with unknown weights: 67
 
 ## Location Value Density Comparison
 
@@ -9,7 +9,7 @@ Average $/gram per location, weighted by drop rates. Uses known weights where av
 
 | # | Location | $/g (sale) | $/g (w/ bundles) | Avg Weight | Avg $/fish | Bundle $/fish | g/hour | $/hour (sale) | $/hour (total) | Fish | Coverage |
 |--:|----------|----------:|----------------:|-----------:|-----------:|--------------:|-------:|--------------:|---------------:|-----:|---------:|
-| 1 | Alamo Sea | 4.41 | **6.36** | 336g | $1,481 | $657 | 10,704 | $47,185 | $68,105 | 499 | 99% |
+| 1 | Alamo Sea | 4.38 | **6.33** | 338g | $1,481 | $657 | 10,762 | $47,185 | $68,105 | 499 | 99% |
 | 2 | Roxwood | 5.34 | **6.11** | 331g | $1,769 | $257 | 8,464 | $45,178 | $51,744 | 256 | 99% |
 | 3 | Dam | 4.85 | **5.92** | 343g | $1,664 | $369 | 10,563 | $51,206 | $62,556 | 335 | 100% |
 
@@ -18,20 +18,20 @@ Average $/gram per location, weighted by drop rates. Uses known weights where av
 | Fish | $/fish | Weight | $/g | Drop % | Stars | Known |
 |------|-------:|-------:|----:|-------:|-------|-------|
 | Silver Trevally | $2,000 | 400g | 5.00 | 4.6% | xxx | est. |
-| Great Barracuda | $2,000 | 400g | 5.00 | 1.8% | xxx | est. |
-| Albacore | $1,350 | 300g | 4.50 | 15.2% | x | est. |
+| Albacore | $1,350 | 300g | 4.50 | 15.2% | x | yes |
 | Scollop | $1,350 | 300g | 4.50 | 10.4% | x | est. |
-| Halibut | $1,350 | 300g | 4.50 | 10.2% | x | est. |
-| Broadbill | $1,350 | 300g | 4.50 | 9.8% | x | est. |
-| Redfish | $1,350 | 300g | 4.50 | 7.0% | x | est. |
+| Halibut | $1,350 | 300g | 4.50 | 10.2% | x | yes |
+| Broadbill | $1,350 | 300g | 4.50 | 9.8% | x | yes |
+| Redfish | $1,350 | 300g | 4.50 | 7.0% | x | yes |
 | Morwhong | $1,350 | 300g | 4.50 | 5.6% | x | est. |
-| Flathead | $1,350 | 300g | 4.50 | 5.6% | x | est. |
-| Southern Garfish | $1,650 | 400g | 4.12 | 7.0% | xx | est. |
-| Trout | $1,650 | 400g | 4.12 | 6.0% | xx | est. |
-| Blue Warehou | $1,650 | 400g | 4.12 | 5.4% | xx | est. |
-| Snow Crab | $1,650 | 400g | 4.12 | 3.4% | xx | est. |
-| Golden Perch | $1,650 | 400g | 4.12 | 3.2% | xx | est. |
+| Flathead | $1,350 | 300g | 4.50 | 5.6% | x | yes |
+| Southern Garfish | $1,650 | 400g | 4.12 | 7.0% | xx | yes |
+| Trout | $1,650 | 400g | 4.12 | 6.0% | xx | yes |
+| Blue Warehou | $1,650 | 400g | 4.12 | 5.4% | xx | yes |
+| Snow Crab | $1,650 | 400g | 4.12 | 3.4% | xx | yes |
+| Golden Perch | $1,650 | 400g | 4.12 | 3.2% | xx | yes |
 | Southern Tuna | $1,650 | 400g | 4.12 | 2.4% | xx | est. |
+| Great Barracuda | $2,000 | 500g | 4.00 | 1.8% | xxx | yes |
 | Bluefin Tuna | $2,000 | 500g | 4.00 | 0.8% | xxx | yes |
 
 ### Roxwood — Fish by $/gram
@@ -84,28 +84,39 @@ Average $/gram per location, weighted by drop rates. Uses known weights where av
 | 1 | Dolphinfish | $2,350 | 300g | 7.83 | $4,250 | $6,600 | **22.00** | xxx | Roxwood |
 | 2 | Ocean Perch | $1,650 | 300g | 5.50 | $3,583 | $5,233 | **17.44** | x | Roxwood |
 | 3 | Brook Trout | $1,500 | 300g | 5.00 | $3,667 | $5,167 | **17.22** | x | Dam |
-| 4 | Red Snapper | $2,000 | 400g | 5.00 | $4,083 | $6,083 | **15.21** | xx | Roxwood |
-| 5 | Trevella | $1,850 | 400g | 4.62 | $4,083 | $5,933 | **14.83** | xx | Dam |
-| 6 | Musky | $2,150 | 500g | 4.30 | $4,250 | $6,400 | **12.80** | xxx | Dam |
-| 7 | Bluefin Tuna | $2,000 | 500g | 4.00 | $4,250 | $6,250 | **12.50** | xxx | Alamo Sea |
-| 8 | Amberjack | $1,650 | 300g | 5.50 | - | $1,650 | **5.50** | x | Roxwood |
-| 9 | Australian Herring | $1,650 | 300g | 5.50 | - | $1,650 | **5.50** | x | Roxwood |
-| 10 | Dungeness Crab | $1,650 | 300g | 5.50 | - | $1,650 | **5.50** | x | Roxwood |
-| 11 | Grouper | $1,650 | 300g | 5.50 | - | $1,650 | **5.50** | x | Roxwood |
-| 12 | Ocean Jacket | $1,650 | 300g | 5.50 | - | $1,650 | **5.50** | x | Roxwood |
-| 13 | Banded Butterflyfish | $1,500 | 300g | 5.00 | - | $1,500 | **5.00** | x | Dam |
-| 14 | Black Bream | $1,500 | 300g | 5.00 | - | $1,500 | **5.00** | x | Dam |
-| 15 | Cod | $1,500 | 300g | 5.00 | - | $1,500 | **5.00** | x | Dam |
-| 16 | Escolar | $1,500 | 300g | 5.00 | - | $1,500 | **5.00** | x | Dam |
-| 17 | Gummy Shark | $2,000 | 400g | 5.00 | - | $2,000 | **5.00** | xx | Roxwood |
-| 18 | Murray Cod | $1,500 | 300g | 5.00 | - | $1,500 | **5.00** | x | Dam |
-| 19 | Sand Whiting | $1,500 | 300g | 5.00 | - | $1,500 | **5.00** | x | Dam |
-| 20 | Silver Perch | $2,000 | 400g | 5.00 | - | $2,000 | **5.00** | xx | Roxwood |
-| 21 | Snapper | $2,000 | 400g | 5.00 | - | $2,000 | **5.00** | xx | Roxwood |
-| 22 | Triggerfish | $1,500 | 300g | 5.00 | - | $1,500 | **5.00** | x | Dam |
-| 23 | Atlantic Salmon | $1,850 | 400g | 4.62 | - | $1,850 | **4.62** | xx | Dam |
-| 24 | Trumpetfish | $1,850 | 400g | 4.62 | - | $1,850 | **4.62** | xx | Dam |
-| 25 | Sandy Sprat | $1,350 | 300g | 4.50 | - | $1,350 | **4.50** | x | Alamo Sea |
+| 4 | Broadbill | $1,350 | 300g | 4.50 | $3,583 | $4,933 | **16.44** | x | Alamo Sea |
+| 5 | Red Snapper | $2,000 | 400g | 5.00 | $4,083 | $6,083 | **15.21** | xx | Roxwood |
+| 6 | Trevella | $1,850 | 400g | 4.62 | $4,083 | $5,933 | **14.83** | xx | Dam |
+| 7 | Blue Warehou | $1,650 | 400g | 4.12 | $4,167 | $5,817 | **14.54** | xx | Alamo Sea |
+| 8 | Musky | $2,150 | 500g | 4.30 | $4,250 | $6,400 | **12.80** | xxx | Dam |
+| 9 | Bluefin Tuna | $2,000 | 500g | 4.00 | $4,250 | $6,250 | **12.50** | xxx | Alamo Sea |
+| 10 | Amberjack | $1,650 | 300g | 5.50 | - | $1,650 | **5.50** | x | Roxwood |
+| 11 | Australian Herring | $1,650 | 300g | 5.50 | - | $1,650 | **5.50** | x | Roxwood |
+| 12 | Dungeness Crab | $1,650 | 300g | 5.50 | - | $1,650 | **5.50** | x | Roxwood |
+| 13 | Grouper | $1,650 | 300g | 5.50 | - | $1,650 | **5.50** | x | Roxwood |
+| 14 | Ocean Jacket | $1,650 | 300g | 5.50 | - | $1,650 | **5.50** | x | Roxwood |
+| 15 | Banded Butterflyfish | $1,500 | 300g | 5.00 | - | $1,500 | **5.00** | x | Dam |
+| 16 | Black Bream | $1,500 | 300g | 5.00 | - | $1,500 | **5.00** | x | Dam |
+| 17 | Cod | $1,500 | 300g | 5.00 | - | $1,500 | **5.00** | x | Dam |
+| 18 | Escolar | $1,500 | 300g | 5.00 | - | $1,500 | **5.00** | x | Dam |
+| 19 | Gummy Shark | $2,000 | 400g | 5.00 | - | $2,000 | **5.00** | xx | Roxwood |
+| 20 | Murray Cod | $1,500 | 300g | 5.00 | - | $1,500 | **5.00** | x | Dam |
+| 21 | Sand Whiting | $1,500 | 300g | 5.00 | - | $1,500 | **5.00** | x | Dam |
+| 22 | Silver Perch | $2,000 | 400g | 5.00 | - | $2,000 | **5.00** | xx | Roxwood |
+| 23 | Snapper | $2,000 | 400g | 5.00 | - | $2,000 | **5.00** | xx | Roxwood |
+| 24 | Triggerfish | $1,500 | 300g | 5.00 | - | $1,500 | **5.00** | x | Dam |
+| 25 | Atlantic Salmon | $1,850 | 400g | 4.62 | - | $1,850 | **4.62** | xx | Dam |
+| 26 | Trumpetfish | $1,850 | 400g | 4.62 | - | $1,850 | **4.62** | xx | Dam |
+| 27 | Albacore | $1,350 | 300g | 4.50 | - | $1,350 | **4.50** | x | Alamo Sea |
+| 28 | Flathead | $1,350 | 300g | 4.50 | - | $1,350 | **4.50** | x | Alamo Sea |
+| 29 | Halibut | $1,350 | 300g | 4.50 | - | $1,350 | **4.50** | x | Alamo Sea |
+| 30 | Redfish | $1,350 | 300g | 4.50 | - | $1,350 | **4.50** | x | Alamo Sea |
+| 31 | Sandy Sprat | $1,350 | 300g | 4.50 | - | $1,350 | **4.50** | x | Alamo Sea |
+| 32 | Golden Perch | $1,650 | 400g | 4.12 | - | $1,650 | **4.12** | xx | Alamo Sea |
+| 33 | Snow Crab | $1,650 | 400g | 4.12 | - | $1,650 | **4.12** | xx | Alamo Sea |
+| 34 | Southern Garfish | $1,650 | 400g | 4.12 | - | $1,650 | **4.12** | xx | Alamo Sea |
+| 35 | Trout | $1,650 | 400g | 4.12 | - | $1,650 | **4.12** | xx | Alamo Sea |
+| 36 | Great Barracuda | $2,000 | 500g | 4.00 | - | $2,000 | **4.00** | xxx | Alamo Sea |
 
 ## Bundle Fish Details
 
@@ -114,8 +125,10 @@ Average $/gram per location, weighted by drop rates. Uses known weights where av
 | Dolphinfish | $2,350 | 300g | 7.83 | Gold Multizone #1 | $4,250 | 22.00 |
 | Ocean Perch | $1,650 | 300g | 5.50 | Bronze Multizone #1 | $3,583 | 17.44 |
 | Brook Trout | $1,500 | 300g | 5.00 | Bronze Multizone #2 | $3,667 | 17.22 |
+| Broadbill | $1,350 | 300g | 4.50 | Bronze Multizone #1 | $3,583 | 16.44 |
 | Red Snapper | $2,000 | 400g | 5.00 | Silver Multizone #2 | $4,083 | 15.21 |
 | Trevella | $1,850 | 400g | 4.62 | Silver Multizone #2 | $4,083 | 14.83 |
+| Blue Warehou | $1,650 | 400g | 4.12 | Silver Multizone #1 | $4,167 | 14.54 |
 | Musky | $2,150 | 500g | 4.30 | Gold Multizone #1 | $4,250 | 12.80 |
 | Bluefin Tuna | $2,000 | 500g | 4.00 | Gold Multizone #1 | $4,250 | 12.50 |
 
@@ -123,9 +136,9 @@ Average $/gram per location, weighted by drop rates. Uses known weights where av
 
 | Stars | Weights Observed | Min | Max | Most Common |
 |------:|------------------|----:|----:|------------:|
-| x | 300g | 300g | 300g | 300g (15/15) |
-| xx | 400g | 400g | 400g | 400g (7/7) |
-| xxx | 300, 500g | 300g | 500g | 500g (2/3) |
+| x | 300g | 300g | 300g | 300g (20/20) |
+| xx | 400g | 400g | 400g | 400g (12/12) |
+| xxx | 300, 500g | 300g | 500g | 500g (3/4) |
 
 ## Fish Without Known Weights
 
@@ -177,7 +190,6 @@ Average $/gram per location, weighted by drop rates. Uses known weights where av
 | Brown Trout | $2,000 | xx | Roxwood | - |
 | Catfish | $2,000 | x | Cave | - |
 | Flounder | $2,000 | x | Cave | - |
-| Great Barracuda | $2,000 | xxx | Alamo Sea | - |
 | Green Eel | $2,000 | x | Cave | Bronze Multizone #2 |
 | Sculpin | $2,000 | x | Cave | - |
 | Silver Trevally | $2,000 | xxx | Alamo Sea | Alamo Starter |
@@ -195,17 +207,7 @@ Average $/gram per location, weighted by drop rates. Uses known weights where av
 | Shortfin Batfish | $1,850 | x | Ocean | - |
 | Sturgeon | $1,850 | xx | Dam | - |
 | Wahoo | $1,850 | xx | Dam | - |
-| Blue Warehou | $1,650 | xx | Alamo Sea | Silver Multizone #1 |
 | Clownfish | $1,650 | x | Roxwood | - |
-| Golden Perch | $1,650 | xx | Alamo Sea | - |
-| Snow Crab | $1,650 | xx | Alamo Sea | - |
-| Southern Garfish | $1,650 | xx | Alamo Sea | - |
 | Southern Tuna | $1,650 | xx | Alamo Sea | Alamo Starter |
-| Trout | $1,650 | xx | Alamo Sea | - |
-| Albacore | $1,350 | x | Alamo Sea | - |
-| Broadbill | $1,350 | x | Alamo Sea | Bronze Multizone #1 |
-| Flathead | $1,350 | x | Alamo Sea | - |
-| Halibut | $1,350 | x | Alamo Sea | - |
 | Morwhong | $1,350 | x | Alamo Sea | Alamo Starter |
-| Redfish | $1,350 | x | Alamo Sea | - |
 | Scollop | $1,350 | x | Alamo Sea | Low Level Multizone |

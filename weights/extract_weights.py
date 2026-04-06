@@ -146,13 +146,40 @@ def validate_entry(entry: dict) -> dict:
     return result
 
 
+def correct_quantity(entry: dict) -> dict:
+    """Try to correct OCR quantity errors using known prices.
+
+    If total_price / expected_price gives a clean integer, use that as the real
+    quantity and recompute per-fish values.
+    """
+    name = entry["name"]
+    if name not in PRICES:
+        return entry
+
+    expected_price = PRICES[name][0]
+    if entry["price_per_fish"] == expected_price:
+        return entry  # already correct
+
+    corrected_qty = entry["total_price"] / expected_price
+    if corrected_qty != int(corrected_qty) or corrected_qty <= 0:
+        return entry  # can't correct
+
+    corrected_qty = int(corrected_qty)
+    corrected = dict(entry)
+    corrected["quantity"] = corrected_qty
+    corrected["price_per_fish"] = entry["total_price"] // corrected_qty
+    corrected["weight_per_fish_g"] = entry["total_weight_g"] // corrected_qty
+    return corrected
+
+
 def process_images(image_paths: list[str]) -> dict[str, int]:
     """Process multiple images and return consolidated fish weights.
 
     Returns dict of fish_name -> weight_per_fish_g
     """
     all_weights: dict[str, int] = {}
-    all_entries: list[dict] = []
+    # Track whether each stored weight came from a price-matched entry
+    weight_price_matched: dict[str, bool] = {}
 
     for path in image_paths:
         print(f"\nProcessing: {path}")
@@ -162,11 +189,18 @@ def process_images(image_paths: list[str]) -> dict[str, int]:
             continue
 
         for entry in entries:
+            # Try to correct quantity using known prices
+            original_qty = entry["quantity"]
+            entry = correct_quantity(entry)
+            qty_corrected = entry["quantity"] != original_qty
+
             validation = validate_entry(entry)
             status_parts = []
 
             if validation["is_new_weight"]:
                 status_parts.append("NEW")
+            if qty_corrected:
+                status_parts.append(f"QTY CORRECTED {original_qty}->{entry['quantity']}")
             if not validation["price_match"]:
                 status_parts.append(
                     f"PRICE MISMATCH (expected ${validation['expected_price']:,})"
@@ -181,15 +215,22 @@ def process_images(image_paths: list[str]) -> dict[str, int]:
                 f"(qty {entry['quantity']}){status}"
             )
 
-            # Store weight (consistent values only)
+            # Store weight, preferring entries where price matches
             name = entry["name"]
             weight = entry["weight_per_fish_g"]
+            price_ok = validation["price_match"]
+
             if name in all_weights and all_weights[name] != weight:
-                print(f"  WARNING: Inconsistent weight for {name}: {all_weights[name]}g vs {weight}g")
+                prev_matched = weight_price_matched.get(name, False)
+                if price_ok and not prev_matched:
+                    print(f"  -> Updating {name} weight: {all_weights[name]}g -> {weight}g (price-matched)")
+                    all_weights[name] = weight
+                    weight_price_matched[name] = True
+                else:
+                    print(f"  WARNING: Inconsistent weight for {name}: {all_weights[name]}g vs {weight}g")
             else:
                 all_weights[name] = weight
-
-            all_entries.append(entry)
+                weight_price_matched[name] = price_ok
 
     return all_weights
 
@@ -228,6 +269,32 @@ def main():
         for name in sorted(extracted):
             if name not in FISH_WEIGHTS:
                 print(f'    "{name}": {extracted[name]},')
+
+        update_constants_file(merged)
+        print("\nUpdated FISH_WEIGHTS in sales/constants.py")
+    else:
+        print("\nNo new entries to add.")
+
+
+def update_constants_file(merged_weights: dict[str, int]) -> None:
+    """Rewrite the FISH_WEIGHTS dict in sales/constants.py with merged data."""
+    constants_path = Path(__file__).resolve().parent.parent / "sales" / "constants.py"
+    content = constants_path.read_text()
+
+    # Build replacement dict string
+    lines = ["FISH_WEIGHTS: dict[str, int] = {"]
+    for name in sorted(merged_weights.keys()):
+        lines.append(f'    "{name}": {merged_weights[name]},')
+    lines.append("}")
+    new_dict = "\n".join(lines)
+
+    # Replace the existing dict block
+    content = re.sub(
+        r"FISH_WEIGHTS: dict\[str, int\] = \{[^}]*\}",
+        new_dict,
+        content,
+    )
+    constants_path.write_text(content)
 
 
 if __name__ == "__main__":
